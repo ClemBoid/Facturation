@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi Facturation - Cloud Sécurisé</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --purple: #9b59b6; --bg: #f5f6fa; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
+        
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .auth-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; width: 100%; max-width: 350px; }
+        .auth-box input { width: 90%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
+        .auth-box button { background: var(--success); color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; }
+        #app-content { display: none; }
+
+        .header { background-color: var(--primary); color: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-buttons button { background-color: var(--accent); color: white; border: none; padding: 10px 15px; margin-left: 5px; border-radius: 5px; cursor: pointer; }
+        .nav-buttons button:hover { background-color: #2980b9; }
+        .btn-logout { background-color: transparent !important; border: 1px solid white !important; }
+        .dashboard { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .card { background: white; padding: 20px; border-radius: 8px; flex: 1; min-width: 180px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .card h3 { margin-top: 0; color: #7f8c8d; font-size: 15px; }
+        .card .amount { font-size: 24px; font-weight: bold; color: var(--primary); }
+        .section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: none; margin-bottom: 20px; }
+        .section.active { display: block; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-success { background-color: var(--success); padding: 10px 15px; font-size: 14px; }
+        .btn-warning { background-color: #f39c12; }
+        .btn-danger { background-color: var(--danger); }
+        .btn-info { background-color: var(--accent); }
+        .btn-print { background-color: #8e44ad; }
+        .btn-excel { background-color: #107c41; }
+        .filters { background: #ecf0f1; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        
+        .multi-select-container { position: relative; display: inline-block; }
+        .multi-select-button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; text-align: left; min-width: 200px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .multi-select-dropdown { display: none; position: absolute; background-color: white; min-width: 200px; max-height: 250px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border: 1px solid #ccc; border-radius: 4px; margin-top: 2px; }
+        .multi-select-dropdown label { display: block; padding: 8px 10px; cursor: pointer; font-weight: normal; margin: 0; font-size: 13px; border-bottom: 1px solid #eee; }
+        .multi-select-dropdown label:hover { background-color: #f1f2f6; }
+        .multi-select-dropdown input[type="checkbox"] { margin-right: 8px; cursor: pointer; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: var(--primary); color: white; cursor: pointer; user-select: none; }
+        th:hover { background-color: #34495e; }
+        .sort-icon { font-size: 10px; margin-left: 5px; }
+        .status-select { font-weight: bold; padding: 4px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+        .action-cell { display: flex; gap: 5px; }
+        .data-management { background: #e8f8f5; padding: 15px; border-radius: 5px; margin-top: 20px; border: 1px dashed var(--success); }
+        
+        @media print {
+            body { background: white; padding: 0; }
+            .header, .dashboard, form, .filters, h2, .nav-buttons, .action-cell, th:last-child, .multi-select-dropdown { display: none !important; }
+            .section { box-shadow: none; padding: 0; margin: 0; display: block !important; }
+            #frais, #sauvegarde { display: none !important; }
+            .print-title { display: block !important; font-size: 20px; margin-bottom: 15px; text-align: center; }
+            table { border: 1px solid #ccc; }
+            th, td { border: 1px solid #ccc; padding: 5px; }
+            select { appearance: none; border: none; background: transparent; }
+            input[type="date"] { border: none; }
+        }
+        .print-title { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div class="auth-box">
+            <h2>🔒 Accès Sécurisé</h2>
+            <p style="font-size: 13px; color: #666;">Veuillez vous authentifier pour déchiffrer la base.</p>
+            <input type="email" id="login-email" placeholder="Adresse Email" required>
+            <input type="password" id="login-pwd" placeholder="Mot de passe" required>
+            <button onclick="login()">Se connecter</button>
+            <p id="auth-error" style="color: red; font-size: 12px; display: none;">Identifiants incorrects.</p>
+        </div>
+    </div>
+
+    <div id="app-content">
+        <div class="header">
+            <h1 style="margin:0; font-size: 20px;">⚖️ Gestion du Cabinet (Cloud)</h1>
+            <div class="nav-buttons">
+                <button onclick="showSection('factures')">Factures</button>
+                <button onclick="showSection('frais')">Notes de Frais</button>
+                <button onclick="showSection('sauvegarde')">Sauvegarde Locale</button>
+                <button class="btn-logout" onclick="logout()">Déconnexion</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card"><h3>CA Encaissé (HT)</h3><div class="amount" id="ca-ht">0,00 €</div></div>
+            <div class="card"><h3>Total Débours</h3><div class="amount" id="total-debours" style="color: var(--purple)">0,00 €</div></div>
+            <div class="card"><h3>Factures en Attente</h3><div class="amount" id="ca-attente" style="color: var(--danger)">0,00 €</div></div>
+            <div class="card"><h3>Total Notes de Frais</h3><div class="amount" id="total-frais">0,00 €</div></div>
+        </div>
+
+        <div id="factures" class="section active">
+            <h2 id="form-title">Créer une Facture</h2>
+            <form onsubmit="saveFacture(event)">
+                <div class="form-grid">
+                    <div class="form-group"><label>Date</label><input type="date" id="fac-date" required onchange="generateInvoiceNumber()"></div>
+                    <div class="form-group"><label>N° Facture</label><input type="text" id="fac-num" required></div>
+                    <div class="form-group"><label>Dossier</label><input type="text" id="fac-dossier" list="dossier-list" required autocomplete="off"><datalist id="dossier-list"></datalist></div>
+                    <div class="form-group"><label>Honoraires HT (€)</label><input type="number" step="0.01" id="fac-ht" oninput="calcTotal()" required></div>
+                    <div class="form-group"><label>Débours (€)</label><input type="number" step="0.01" id="fac-debours" oninput="calcTotal()" value="0" required></div>
+                    <div class="form-group"><label>Total Facturé</label><input type="text" id="fac-total" readonly style="background:#eee;"></div>
+                    <div class="form-group"><label>Statut</label>
+                        <select id="fac-payee"><option value="NON">Impayée ❌</option><option value="OUI">Payée ✅</option></select>
+                    </div>
+                    <div class="form-group"><label>Date Paiement</label><input type="date" id="fac-date-paiement"></div>
+                </div>
+                <div style="text-align: right; margin-top: 10px;">
+                    <button type="button" id="cancel-btn" class="btn btn-warning" style="display:none; margin-right: 10px;" onclick="cancelEdit()">Annuler</button>
+                    <button type="submit" id="submit-btn" class="btn btn-success">Ajouter au registre</button>
+                </div>
+            </form>
+
+            <h2 style="margin-top: 30px;">Registre des Factures</h2>
+            <h1 class="print-title" id="print-title">Registre des factures</h1>
+            
+            <div class="filters">
+                <select id="search-year" onchange="renderFactures(); updateDashboard();"><option value="ALL">Toutes les années</option></select>
+                <div class="multi-select-container">
+                    <button type="button" class="multi-select-button" id="dossier-select-btn" onclick="toggleDossierDropdown(event)">Tous les dossiers <span style="font-size:10px;">▼</span></button>
+                    <div class="multi-select-dropdown" id="dossier-dropdown"></div>
+                </div>
+                <select id="search-status" onchange="renderFactures()">
+                    <option value="ALL">Tous les statuts</option><option value="OUI">Payées ✅</option><option value="NON">Impayées ❌</option>
+                </select>
+                <input type="text" id="search-text" placeholder="Recherche N°..." onkeyup="renderFactures()" style="width: 130px;">
+                <button class="btn btn-warning" onclick="clearFilters()">Réinitialiser</button>
+                <div style="flex-grow: 1;"></div>
+                <button class="btn btn-print" onclick="printTable()">🖨️ Imprimer</button>
+                <button class="btn btn-excel" onclick="exportExcelDirect()">📗 Exporter vers Excel</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th onclick="sortTable('num')">N° <span class="sort-icon" id="sort-num"></span></th><th onclick="sortTable('date')">Date <span class="sort-icon" id="sort-date"></span></th><th onclick="sortTable('dossier')">Dossier <span class="sort-icon" id="sort-dossier"></span></th><th onclick="sortTable('ht')">HT <span class="sort-icon" id="sort-ht"></span></th><th onclick="sortTable('debours')">Débours <span class="sort-icon" id="sort-debours"></span></th><th onclick="sortTable('total')">Total <span class="sort-icon" id="sort-total"></span></th><th onclick="sortTable('payee')">Statut <span class="sort-icon" id="sort-payee"></span></th><th onclick="sortTable('date_paiement')">Date Paiement <span class="sort-icon" id="sort-datePaiement"></span></th><th>Action</th></tr>
+                </thead>
+                <tbody id="factures-body"></tbody>
+                <tfoot id="factures-foot" style="font-weight: bold; background: #ecf0f1; display: none;">
+                    <tr><td colspan="3" style="text-align: right;">TOTAL AFFICHE :</td><td id="tot-aff-ht">0,00 €</td><td id="tot-aff-deb">0,00 €</td><td id="tot-aff-ttc">0,00 €</td><td colspan="3"></td></tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div id="frais" class="section">
+            <h2>Ajouter une Note de Frais</h2>
+            <form onsubmit="addFrais(event)">
+                <div class="form-grid">
+                    <div class="form-group"><label>Date</label><input type="date" id="frais-date" required></div>
+                    <div class="form-group"><label>Type</label>
+                        <select id="frais-type"><option value="Indemnité Kilométrique">Indemnité Kilométrique</option><option value="Péage">Péage</option><option value="Parking">Parking</option><option value="Repas">Repas</option><option value="Autre">Autre</option></select>
+                    </div>
+                    <div class="form-group"><label>Montant (€)</label><input type="number" step="0.01" id="frais-montant" required></div>
+                    <div class="form-group"><label>Dossier lié</label><input type="text" id="frais-dossier"></div>
+                </div>
+                <div style="text-align: right; margin-top: 10px;"><button type="submit" class="btn btn-success">Ajouter le frais</button></div>
+            </form>
+            <h2 style="margin-top: 30px;">Historique des Frais</h2>
+            <table>
+                <thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Dossier lié</th><th>Action</th></tr></thead>
+                <tbody id="frais-body"></tbody>
+            </table>
+        </div>
+
+        <div id="sauvegarde" class="section">
+            <h2>💾 Sauvegarde Locale & Récupération</h2>
+            <div class="data-management">
+                <h3>1. Sauvegarde de sécurité locale</h3>
+                <button class="btn btn-success" onclick="exportJSON()">Télécharger la base de données (.json)</button>
+                <br><br>
+                <p>Restaurer une ancienne sauvegarde locale vers le serveur :</p>
+                <input type="file" id="import-json-file" accept=".json">
+                <button class="btn btn-warning" onclick="importJSON()">Uploader les données</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🚨 CONFIGURATION SUPABASE À REMPLIR ICI 🚨
+        const SUPABASE_URL = 'https://hnwykzwlixhednsiymny.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhud3lrendsaXhoZWRuc2l5bW55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY1NjIsImV4cCI6MjA5NjE2MjU2Mn0.JvLwwH1UMot9BrQsx_yQuVin5pKM8FldSG9C95kMDDU';
+        // ==========================================
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let factures = [], frais = [], editingId = null, currentSortCol = 'date', isSortAsc = false;
+
+        async function checkSession() {
+            const { data, error } = await supabase.auth.getSession();
+            if (data.session) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+                loadDataFromServer();
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-pwd').value;
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) document.getElementById('auth-error').style.display = 'block';
+            else {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+                loadDataFromServer();
+            }
+        }
+
+        async function logout() { await supabase.auth.signOut(); location.reload(); }
+        checkSession();
+
+        async function loadDataFromServer() {
+            const { data: fData } = await supabase.from('factures').select('*').order('date', { ascending: false });
+            if(fData) factures = fData;
+            const { data: frData } = await supabase.from('frais').select('*').order('date', { ascending: false });
+            if(frData) frais = frData;
+
+            document.getElementById('fac-date').valueAsDate = new Date();
+            document.getElementById('frais-date').valueAsDate = new Date();
+            updateYearsDropdown();
+            document.getElementById('search-year').value = new Date().getFullYear().toString();
+            
+            generateInvoiceNumber();
+            updateDossiersList();
+            renderFactures();
+            renderFrais();
+            updateDashboard();
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.matches('.multi-select-button') && !event.target.closest('.multi-select-dropdown') && !event.target.matches('#dossier-select-btn span')) {
+                const dropdowns = document.getElementsByClassName("multi-select-dropdown");
+                for (let i = 0; i < dropdowns.length; i++) { if (dropdowns[i].style.display === 'block') dropdowns[i].style.display = 'none'; }
+            }
+        }
+
+        function formatMoney(amount) { return Number(amount).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+        function formatDateFR(dateString) { if (!dateString) return ""; const p = dateString.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; }
+        function showSection(id) { document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        function calcTotal() { const ht = parseFloat(document.getElementById('fac-ht').value) || 0; const deb = parseFloat(document.getElementById('fac-debours').value) || 0; document.getElementById('fac-total').value = formatMoney(ht + deb) + ' €'; }
+
+        function updateYearsDropdown() {
+            const select = document.getElementById('search-year'); const currentYear = select.value;
+            select.innerHTML = '<option value="ALL">Toutes les années</option>';
+            const years = [...new Set(factures.map(f => f.date.split('-')[0]))].filter(y => y);
+            const currentY = new Date().getFullYear().toString(); if(!years.includes(currentY)) years.push(currentY);
+            years.sort((a,b) => b - a).forEach(year => { select.innerHTML += `<option value="${year}">${year}</option>`; });
+            if (years.includes(currentYear) && currentYear !== "") select.value = currentYear;
+        }
+
+        function generateInvoiceNumber() {
+            if (editingId) return;
+            const dateInput = document.getElementById('fac-date').value; if (!dateInput) return;
+            const year = dateInput.split('-')[0]; let maxNum = 0;
+            factures.forEach(f => { if (f.num.startsWith(year + '-')) { const numPart = parseInt(f.num.split('-')[1]); if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart; } });
+            document.getElementById('fac-num').value = `${year}-${(maxNum + 1).toString().padStart(3, '0')}`;
+        }
+
+        function toggleDossierDropdown() {
+            const dropdown = document.getElementById('dossier-dropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function toggleAllDossiers(source) {
+            document.querySelectorAll('.dossier-cb').forEach(cb => cb.checked = source.checked);
+            handleDossierCheck();
+        }
+
+        function updateDossierButtonText() {
+            const allCb = document.querySelectorAll('.dossier-cb');
+            const checkedBoxes = document.querySelectorAll('.dossier-cb:checked');
+            const selectAllCb = document.getElementById('select-all-dossiers');
+            const btn = document.getElementById('dossier-select-btn');
+            
+            if(selectAllCb) selectAllCb.checked = (allCb.length > 0 && allCb.length === checkedBoxes.length);
+            if(checkedBoxes.length === 0 || checkedBoxes.length === allCb.length) btn.innerHTML = 'Tous les dossiers <span style="font-size:10px;">▼</span>';
+            else if (checkedBoxes.length === 1) btn.innerHTML = (checkedBoxes[0].value.length > 20 ? checkedBoxes[0].value.substring(0, 20) + '...' : checkedBoxes[0].value) + ' <span style="font-size:10px;">▼</span>';
+            else btn.innerHTML = checkedBoxes.length + ' dossiers sélectionnés <span style="font-size:10px;">▼</span>';
+        }
+
+        function handleDossierCheck() { updateDossierButtonText(); renderFactures(); }
+
+        function updateDossiersList() {
+            const datalist = document.getElementById('dossier-list'); const dropdown = document.getElementById('dossier-dropdown');
+            const currentlyChecked = Array.from(document.querySelectorAll('.dossier-cb:checked')).map(cb => cb.value);
+            datalist.innerHTML = '';
+            const uniqueDossiers = [...new Set(factures.map(f => f.dossier))].sort((a, b) => a.localeCompare(b, 'fr'));
+            const isAllChecked = (uniqueDossiers.length > 0 && currentlyChecked.length === uniqueDossiers.length);
+            
+            dropdown.innerHTML = `<label style="background: #f8f9fa;"><input type="checkbox" id="select-all-dossiers" onchange="toggleAllDossiers(this)" ${isAllChecked ? 'checked' : ''}><i>Sélectionner tout</i></label>`;
+            
+            uniqueDossiers.forEach(d => {
+                datalist.innerHTML += `<option value="${d}">`;
+                const shouldBeChecked = (currentlyChecked.length === 0) || currentlyChecked.includes(d);
+                dropdown.innerHTML += `<label><input type="checkbox" class="dossier-cb" value="${d}" onchange="handleDossierCheck()" ${shouldBeChecked ? 'checked' : ''}>${d}</label>`;
+            });
+            updateDossierButtonText();
+        }
+
+        async function saveFacture(e) {
+            e.preventDefault();
+            const ht = parseFloat(document.getElementById('fac-ht').value); const debours = parseFloat(document.getElementById('fac-debours').value);
+            const factureData = {
+                num: document.getElementById('fac-num').value, date: document.getElementById('fac-date').value,
+                dossier: document.getElementById('fac-dossier').value, ht: ht, debours: debours, total: ht + debours,
+                payee: document.getElementById('fac-payee').value, date_paiement: document.getElementById('fac-date-paiement').value || null
+            };
+
+            if (editingId) { await supabase.from('factures').update(factureData).eq('id', editingId); cancelEdit(); }
+            else { await supabase.from('factures').insert([factureData]); e.target.reset(); document.getElementById('fac-date').valueAsDate = new Date(); generateInvoiceNumber(); }
+            loadDataFromServer();
+        }
+
+        function editFacture(id) {
+            const f = factures.find(f => f.id === id); if (!f) return;
+            editingId = id;
+            document.getElementById('form-title').innerText = "✏️ Modifier la facture";
+            document.getElementById('submit-btn').innerText = "Mettre à jour";
+            document.getElementById('submit-btn').classList.replace('btn-success', 'btn-info');
+            document.getElementById('cancel-btn').style.display = "inline-flex";
+
+            document.getElementById('fac-num').value = f.num; document.getElementById('fac-date').value = f.date;
+            document.getElementById('fac-dossier').value = f.dossier; document.getElementById('fac-ht').value = f.ht;
+            document.getElementById('fac-debours').value = f.debours; document.getElementById('fac-payee').value = f.payee;
+            document.getElementById('fac-date-paiement').value = f.date_paiement || '';
+            calcTotal(); window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            document.getElementById('form-title').innerText = "Créer une Facture";
+            document.getElementById('submit-btn').innerText = "Ajouter au registre";
+            document.getElementById('submit-btn').classList.replace('btn-info', 'btn-success');
+            document.getElementById('cancel-btn').style.display = "none";
+            document.querySelector('#factures form').reset();
+            document.getElementById('fac-date').valueAsDate = new Date();
+            generateInvoiceNumber(); calcTotal();
+        }
+
+        async function updateStatus(id, value) {
+            const index = factures.findIndex(f => f.id === id);
+            if (index > -1) {
+                let dateP = factures[index].date_paiement;
+                if(value === 'OUI' && !dateP) dateP = new Date().toISOString().split('T')[0];
+                else if(value === 'NON') dateP = null;
+                await supabase.from('factures').update({ payee: value, date_paiement: dateP }).eq('id', id); loadDataFromServer();
+            }
+        }
+
+        async function updateDate(id, value) { await supabase.from('factures').update({ date_paiement: value || null, payee: value ? 'OUI' : 'NON' }).eq('id', id); loadDataFromServer(); }
+        async function deleteFacture(id) { if(confirm("Supprimer du serveur ?")) { await supabase.from('factures').delete().eq('id', id); loadDataFromServer(); } }
+
+        function clearFilters() {
+            document.getElementById('search-year').value = new Date().getFullYear().toString();
+            document.getElementById('search-status').value = 'ALL'; document.getElementById('search-text').value = '';
+            const selectAllCb = document.getElementById('select-all-dossiers'); if (selectAllCb) { selectAllCb.checked = true; toggleAllDossiers(selectAllCb); }
+            renderFactures(); updateDashboard();
+        }
+
+        function printTable() {
+            const year = document.getElementById('search-year').value;
+            document.getElementById('print-title').innerText = year === "ALL" ? "Registre complet" : `Registre des factures - ${year}`;
+            window.print();
+        }
+
+        function sortTable(column) {
+            if (currentSortCol === column) isSortAsc = !isSortAsc; else { currentSortCol = column; isSortAsc = true; }
+            document.querySelectorAll('.sort-icon').forEach(el => el.innerHTML = '');
+            document.getElementById('sort-' + column).innerHTML = isSortAsc ? '▲' : '▼'; renderFactures();
+        }
+
+        function renderFactures() {
+            const tbody = document.getElementById('factures-body'); tbody.innerHTML = '';
+            const sYear = document.getElementById('search-year').value;
+            const sText = document.getElementById('search-text').value.toLowerCase();
+            const sStatus = document.getElementById('search-status').value;
+            const checkedDossiers = Array.from(document.querySelectorAll('.dossier-cb:checked')).map(cb => cb.value);
+
+            let filtered = factures.filter(f =>
+                (sYear === 'ALL' || f.date.startsWith(sYear)) && (checkedDossiers.length === 0 || checkedDossiers.includes(f.dossier)) &&
+                (sStatus === 'ALL' || f.payee === sStatus) && (sText === '' || f.num.toLowerCase().includes(sText) || f.dossier.toLowerCase().includes(sText))
+            );
+
+            let sumHT = 0, sumDeb = 0, sumTotal = 0;
+            filtered.sort((a, b) => { let vA = a[currentSortCol], vB = b[currentSortCol]; if(typeof vA==='string') vA=vA.toLowerCase(); if(typeof vB==='string') vB=vB.toLowerCase(); return vA<vB ? (isSortAsc?-1:1) : (vA>vB ? (isSortAsc?1:-1) : 0); });
+
+            filtered.forEach(f => {
+                sumHT += Number(f.ht); sumDeb += Number(f.debours); sumTotal += Number(f.total);
+                const bgColor = f.payee === 'OUI' ? '#d4edda' : '#f8d7da'; const textColor = f.payee === 'OUI' ? '#155724' : '#721c24';
+                const dateBg = f.date_paiement ? 'white' : '#e2e3e5'; const dateColor = f.date_paiement ? '#333' : '#6c757d';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${f.num}</b></td><td>${formatDateFR(f.date)}</td><td>${f.dossier}</td>
+                    <td>${formatMoney(f.ht)} €</td><td>${formatMoney(f.debours)} €</td><td><b>${formatMoney(f.total)} €</b></td>
+                    <td><select class="status-select" onchange="updateStatus(${f.id}, this.value)" style="background-color: ${bgColor}; color: ${textColor};"><option value="OUI" ${f.payee === 'OUI' ? 'selected' : ''}>Payée ✅</option><option value="NON" ${f.payee === 'NON' ? 'selected' : ''}>Impayée ❌</option></select></td>
+                    <td><input type="date" value="${f.date_paiement || ''}" onchange="updateDate(${f.id}, this.value)" style="background-color: ${dateBg}; color: ${dateColor}; border: 1px solid #ccc; border-radius: 4px; padding: 5px;"></td>
+                    <td class="action-cell"><button class="btn btn-info" onclick="editFacture(${f.id})">✏️</button><button class="btn btn-danger" onclick="deleteFacture(${f.id})">X</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const tfoot = document.getElementById('factures-foot');
+            if(filtered.length > 0) { tfoot.style.display = "table-row-group"; document.getElementById('tot-aff-ht').innerText = formatMoney(sumHT) + " €"; document.getElementById('tot-aff-deb').innerText = formatMoney(sumDeb) + " €"; document.getElementById('tot-aff-ttc').innerText = formatMoney(sumTotal) + " €"; }
+            else tfoot.style.display = "none";
+        }
+
+        async function addFrais(e) { e.preventDefault(); const fraisData = { date: document.getElementById('frais-date').value, type: document.getElementById('frais-type').value, montant: parseFloat(document.getElementById('frais-montant').value), dossier: document.getElementById('frais-dossier').value }; await supabase.from('frais').insert([fraisData]); e.target.reset(); loadDataFromServer(); }
+        async function deleteFrais(id) { if(confirm("Supprimer ?")) { await supabase.from('frais').delete().eq('id', id); loadDataFromServer(); } }
+        function renderFrais() { document.getElementById('frais-body').innerHTML = ''; frais.forEach(f => { document.getElementById('frais-body').innerHTML += `<tr><td>${formatDateFR(f.date)}</td><td>${f.type}</td><td>${formatMoney(f.montant)} €</td><td>${f.dossier || ''}</td><td><button class="btn btn-danger" onclick="deleteFrais(${f.id})">X</button></td></tr>`; }); }
+
+        function updateDashboard() {
+            const sYear = document.getElementById('search-year') ? document.getElementById('search-year').value : 'ALL';
+            const fAnnee = factures.filter(f => sYear === 'ALL' || f.date.startsWith(sYear)); const frAnnee = frais.filter(f => sYear === 'ALL' || f.date.startsWith(sYear));
+            document.getElementById('ca-ht').innerText = formatMoney(fAnnee.filter(f => f.payee === 'OUI').reduce((a,c) => a + Number(c.ht), 0)) + ' €';
+            document.getElementById('total-debours').innerText = formatMoney(fAnnee.reduce((a,c) => a + Number(c.debours), 0)) + ' €';
+            document.getElementById('ca-attente').innerText = formatMoney(fAnnee.filter(f => f.payee === 'NON').reduce((a,c) => a + Number(c.total), 0)) + ' €';
+            document.getElementById('total-frais').innerText = formatMoney(frAnnee.reduce((a,c) => a + Number(c.montant), 0)) + ' €';
+        }
+
+        function exportExcelDirect() {
+            let csv = "data:text/csv;charset=utf-8,\uFEFF"; csv += "Numéro;Date;Dossier;Honoraires HT;Débours;Total Facturé;Statut;Date Paiement\n";
+            const sYear = document.getElementById('search-year').value; const sText = document.getElementById('search-text').value.toLowerCase(); const sStatus = document.getElementById('search-status').value;
+            const checkedDossiers = Array.from(document.querySelectorAll('.dossier-cb:checked')).map(cb => cb.value);
+            let filtered = factures.filter(f => (sYear === 'ALL' || f.date.startsWith(sYear)) && (checkedDossiers.length === 0 || checkedDossiers.includes(f.dossier)) && (sStatus === 'ALL' || f.payee === sStatus) && (sText === '' || f.num.toLowerCase().includes(sText) || f.dossier.toLowerCase().includes(sText)));
+            filtered.forEach(f => { csv += `${f.num};${formatDateFR(f.date)};${f.dossier};${Number(f.ht).toFixed(2).replace('.',',')};${Number(f.debours).toFixed(2).replace('.',',')};${Number(f.total).toFixed(2).replace('.',',')};${f.payee === 'OUI'?'Payée':'Impayée'};${formatDateFR(f.date_paiement)}\n`; });
+            const a = document.createElement("a"); a.href = encodeURI(csv); a.download = `Export_Excel_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+        }
+
+        async function exportJSON() {
+            const data = JSON.stringify({factures, frais}, null, 2); const fileName = 'sauvegarde_cabinet_cloud_' + new Date().toISOString().split('T')[0] + '.json';
+            try {
+                if (window.showSaveFilePicker) { const handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'JSON', accept: {'application/json': ['.json']} }] }); const writable = await handle.createWritable(); await writable.write(data); await writable.close(); alert("Sauvegarde enregistrée !"); }
+                else { const blob = new Blob([data], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName; a.click(); }
+            } catch (err) { if (err.name !== 'AbortError') alert("Erreur."); }
+        }
+
+        async function importJSON() {
+            const file = document.getElementById('import-json-file').files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async e => {
+                const d = JSON.parse(e.target.result);
+                if(confirm("Cela va uploader vos anciennes données locales vers le serveur cloud. Continuer ?")) {
+                    if(d.factures && d.factures.length > 0) { const cleanF = d.factures.map(f => ({ num: f.num, date: f.date, dossier: f.dossier, ht: f.ht, debours: f.debours, total: f.total, payee: f.payee, date_paiement: f.datePaiement || f.date_paiement || null })); await supabase.from('factures').insert(cleanF); }
+                    if(d.frais && d.frais.length > 0) { const cleanFr = d.frais.map(f => ({ date: f.date, type: f.type, montant: f.montant, dossier: f.dossier })); await supabase.from('frais').insert(cleanFr); }
+                    alert("Importation terminée !"); loadDataFromServer();
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
