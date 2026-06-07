@@ -121,11 +121,10 @@
     <div id="auth-overlay">
         <div class="auth-box">
             <h2>🔒 Accès Sécurisé</h2>
-            <p>Veuillez vous authentifier pour accéder à la base.</p>
-            <input type="email" id="login-email" placeholder="Adresse Email" required>
+            <p>Saisissez le mot de passe pour accéder à la base.</p>
             <input type="password" id="login-pwd" placeholder="Mot de passe" required>
             <button class="btn-login" onclick="login()">Se connecter</button>
-            <p id="auth-error">Identifiants incorrects.</p>
+            <p id="auth-error">Mot de passe incorrect.</p>
         </div>
     </div>
 
@@ -143,7 +142,7 @@
             <button onclick="showSection(&#39;dossiers&#39;)" style="background-color: #8e44ad;">📂 Dossiers</button>
             <button onclick="showSection(&#39;analyse&#39;)" style="background-color: #e67e22;">📊 Analyse</button>
             <button onclick="showSection(&#39;sauvegarde&#39;)">Sauvegarde</button>
-            <button onclick="logout()" style="background-color: transparent; border: 1px solid white;">Déconnexion</button>
+            <button onclick="logout()" style="background-color: transparent; border: 1px solid white; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">Déconnexion</button>
         </div>
     </div>
 
@@ -703,7 +702,7 @@
     <script>
         // ==========================================
         // 🚨 CONFIGURATION SUPABASE À REMPLIR ICI 🚨
-        const SUPABASE_URL = 'https://hnwykzwlixhednsiymny.supabase.co';
+        const SUPABASE_URL = 'https://hnwykzwlixhednsiymny.supabase.co/rest/v1/';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhud3lrendsaXhoZWRuc2l5bW55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY1NjIsImV4cCI6MjA5NjE2MjU2Mn0.JvLwwH1UMot9BrQsx_yQuVin5pKM8FldSG9C95kMDDU';
         // ==========================================
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -721,48 +720,36 @@
         let sortColFrais = 'date', sortAscFrais = false;
         let sortColCharges = 'date', sortAscCharges = false;
 
-        // --- AUTH SUPABASE ---
+        // --- AUTH LOCALE (mot de passe simple) ---
+        // 🚨 CHANGEZ CE MOT DE PASSE 🚨
+        const APP_PASSWORD = 'cabinet2024';
+
+        function checkSession() {
+            if (sessionStorage.getItem('auth') === 'ok') { showApp(); loadDataFromServer(); }
+        }
+
+        function login() {
+            document.getElementById('auth-error').style.display = 'none';
+            const pwd = document.getElementById('login-pwd').value;
+            if (pwd === APP_PASSWORD) {
+                sessionStorage.setItem('auth', 'ok');
+                showApp();
+                loadDataFromServer();
+            } else {
+                document.getElementById('auth-error').style.display = 'block';
+            }
+        }
+
+        function logout() { sessionStorage.removeItem('auth'); location.reload(); }
+
         function showApp() {
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
         }
 
-        async function login() {
-            document.getElementById('auth-error').style.display = 'none';
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-pwd').value;
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                document.getElementById('auth-error').style.display = 'block';
-            }
-            // Si succès, onAuthStateChange détecte SIGNED_IN et charge les données
-        }
-
-        async function logout() {
-            await supabaseClient.auth.signOut();
-            location.reload();
-        }
-
         document.getElementById('login-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-        document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
-        // Point d'entrée unique : écouter les changements de session
-        // Cela gère à la fois la reconnexion automatique et la connexion initiale
-        supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-                showApp();
-                await loadDataFromServer();
-            } else if (event === 'SIGNED_OUT') {
-                location.reload();
-            } else if (event === 'INITIAL_SESSION') {
-                if (session) {
-                    // Session existante trouvée (reconnexion automatique)
-                    showApp();
-                    await loadDataFromServer();
-                }
-                // Si pas de session : on reste sur l'écran de login
-            }
-        });
+        checkSession();
 
         // --- CHARGEMENT DONNÉES DEPUIS SUPABASE ---
         async function loadDataFromServer() {
@@ -885,6 +872,9 @@
         // saveData() : après toute écriture Supabase, on recharge depuis le serveur
         async function saveData() {
             await loadDataFromServer();
+            if (document.getElementById('analyse').classList.contains('active')) updateAnalyse();
+            if (document.getElementById('dossiers').classList.contains('active')) renderBilanDossier();
+            checkAlerts();
         }
 
         function showSection(id) {
