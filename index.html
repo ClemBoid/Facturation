@@ -721,31 +721,48 @@
         let sortColFrais = 'date', sortAscFrais = false;
         let sortColCharges = 'date', sortAscCharges = false;
 
-        // --- AUTH ---
-        async function checkSession() {
-            const { data } = await supabaseClient.auth.getSession();
-            if (data.session) { showApp(); await loadDataFromServer(); }
+        // --- AUTH SUPABASE ---
+        function showApp() {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
         }
 
         async function login() {
             document.getElementById('auth-error').style.display = 'none';
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-pwd').value;
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) { document.getElementById('auth-error').style.display = 'block'; }
-            else { showApp(); await loadDataFromServer(); }
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                document.getElementById('auth-error').style.display = 'block';
+            }
+            // Si succès, onAuthStateChange détecte SIGNED_IN et charge les données
         }
 
-        async function logout() { await supabaseClient.auth.signOut(); location.reload(); }
-
-        function showApp() {
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
+        async function logout() {
+            await supabaseClient.auth.signOut();
+            location.reload();
         }
 
         document.getElementById('login-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+        document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
-        checkSession();
+        // Point d'entrée unique : écouter les changements de session
+        // Cela gère à la fois la reconnexion automatique et la connexion initiale
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                showApp();
+                await loadDataFromServer();
+            } else if (event === 'SIGNED_OUT') {
+                location.reload();
+            } else if (event === 'INITIAL_SESSION') {
+                if (session) {
+                    // Session existante trouvée (reconnexion automatique)
+                    showApp();
+                    await loadDataFromServer();
+                }
+                // Si pas de session : on reste sur l'écran de login
+            }
+        });
 
         // --- CHARGEMENT DONNÉES DEPUIS SUPABASE ---
         async function loadDataFromServer() {
