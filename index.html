@@ -702,7 +702,7 @@
     <script>
         // ==========================================
         // 🚨 CONFIGURATION SUPABASE À REMPLIR ICI 🚨
-        const SUPABASE_URL = 'https://hnwykzwlixhednsiymny.supabase.co/rest/v1/';
+        const SUPABASE_URL = 'https://hnwykzwlixhednsiymny.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhud3lrendsaXhoZWRuc2l5bW55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY1NjIsImV4cCI6MjA5NjE2MjU2Mn0.JvLwwH1UMot9BrQsx_yQuVin5pKM8FldSG9C95kMDDU';
         // ==========================================
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -720,27 +720,30 @@
         let sortColFrais = 'date', sortAscFrais = false;
         let sortColCharges = 'date', sortAscCharges = false;
 
-        // --- AUTH LOCALE (mot de passe simple) ---
-        // 🚨 CHANGEZ CE MOT DE PASSE 🚨
-        const APP_PASSWORD = 'cabinet2024';
+        // --- AUTH SUPABASE (mot de passe uniquement, email fixé) ---
+        const APP_EMAIL = 'cboidin.avocat@gmail.com';
 
-        function checkSession() {
-            if (sessionStorage.getItem('auth') === 'ok') { showApp(); loadDataFromServer(); }
+        async function checkSession() {
+            const { data } = await supabaseClient.auth.getSession();
+            if (data.session) { showApp(); loadDataFromServer(); }
         }
 
-        function login() {
+        async function login() {
             document.getElementById('auth-error').style.display = 'none';
+            const btn = document.querySelector('.btn-login');
+            btn.disabled = true; btn.innerText = 'Connexion...';
             const pwd = document.getElementById('login-pwd').value;
-            if (pwd === APP_PASSWORD) {
-                sessionStorage.setItem('auth', 'ok');
+            const { error } = await supabaseClient.auth.signInWithPassword({ email: APP_EMAIL, password: pwd });
+            btn.disabled = false; btn.innerText = 'Se connecter';
+            if (error) {
+                document.getElementById('auth-error').style.display = 'block';
+            } else {
                 showApp();
                 loadDataFromServer();
-            } else {
-                document.getElementById('auth-error').style.display = 'block';
             }
         }
 
-        function logout() { sessionStorage.removeItem('auth'); location.reload(); }
+        async function logout() { await supabaseClient.auth.signOut(); location.reload(); }
 
         function showApp() {
             document.getElementById('auth-overlay').style.display = 'none';
@@ -1033,6 +1036,8 @@
 
         async function saveFacture(e) {
             e.preventDefault();
+            const btn = document.getElementById('submit-btn-fac');
+            const origText = btn.innerText; btn.disabled = true; btn.innerText = '⏳ Enregistrement...';
             const ht = parseFloat(document.getElementById('fac-ht').value), deb = parseFloat(document.getElementById('fac-debours').value);
             const factureData = {
                 num: document.getElementById('fac-num').value, date: document.getElementById('fac-date').value,
@@ -1040,13 +1045,15 @@
                 payee: document.getElementById('fac-payee').value,
                 date_paiement: document.getElementById('fac-date-paiement').value || null
             };
+            let result;
             if (editingIdFac) {
-                await supabaseClient.from('factures').update(factureData).eq('id', editingIdFac);
-                cancelEditFac();
+                result = await supabaseClient.from('factures').update(factureData).eq('id', editingIdFac);
             } else {
-                await supabaseClient.from('factures').insert([factureData]);
-                e.target.reset(); document.getElementById('fac-date').valueAsDate = new Date(); generateInvoiceNumber();
+                result = await supabaseClient.from('factures').insert([factureData]);
             }
+            btn.disabled = false; btn.innerText = origText;
+            if (result.error) { alert('❌ Erreur Supabase : ' + result.error.message); return; }
+            if (editingIdFac) { cancelEditFac(); } else { e.target.reset(); document.getElementById('fac-date').valueAsDate = new Date(); generateInvoiceNumber(); }
             await saveData(); calcTotal();
         }
 
@@ -1157,14 +1164,18 @@
         // ==========================
         async function saveFrais(e) {
             e.preventDefault();
+            const btn = document.getElementById('submit-btn-frais');
+            const origText = btn.innerText; btn.disabled = true; btn.innerText = '⏳ Enregistrement...';
             const fData = { date: document.getElementById('frais-date').value, type: document.getElementById('frais-type').value, montant: parseFloat(document.getElementById('frais-montant').value), dossier: document.getElementById('frais-dossier').value };
+            let result;
             if (editingIdFrais) {
-                await supabaseClient.from('frais').update(fData).eq('id', editingIdFrais);
-                cancelEditFrais();
+                result = await supabaseClient.from('frais').update(fData).eq('id', editingIdFrais);
             } else {
-                await supabaseClient.from('frais').insert([fData]);
-                e.target.reset(); document.getElementById('frais-date').valueAsDate = new Date();
+                result = await supabaseClient.from('frais').insert([fData]);
             }
+            btn.disabled = false; btn.innerText = origText;
+            if (result.error) { alert('❌ Erreur Supabase : ' + result.error.message); return; }
+            if (editingIdFrais) { cancelEditFrais(); } else { e.target.reset(); document.getElementById('frais-date').valueAsDate = new Date(); }
             await saveData();
         }
 
@@ -1250,14 +1261,20 @@
 
         async function saveCharge(e) {
             e.preventDefault();
+            const btn = document.getElementById('submit-btn-charges');
+            const origText = btn.innerText; btn.disabled = true; btn.innerText = '⏳ Enregistrement...';
             let finalType = document.getElementById('charge-type').value;
             if (finalType === 'Autre') finalType = document.getElementById('charge-type-autre').value;
             const cData = { date: document.getElementById('charge-date').value, type: finalType, notes: document.getElementById('charge-notes').value, statut: document.getElementById('charge-statut').value, montant: parseFloat(document.getElementById('charge-montant').value) };
+            let result;
             if (editingIdCharge) {
-                await supabaseClient.from('charges').update(cData).eq('id', editingIdCharge);
-                cancelEditCharge();
+                result = await supabaseClient.from('charges').update(cData).eq('id', editingIdCharge);
             } else {
-                await supabaseClient.from('charges').insert([cData]);
+                result = await supabaseClient.from('charges').insert([cData]);
+            }
+            btn.disabled = false; btn.innerText = origText;
+            if (result.error) { alert('❌ Erreur Supabase : ' + result.error.message); return; }
+            if (editingIdCharge) { cancelEditCharge(); } else {
                 e.target.reset(); document.getElementById('charge-date').valueAsDate = new Date();
                 document.getElementById('charge-type-autre').style.display = 'none'; document.getElementById('charge-type-autre').required = false;
             }
@@ -1486,23 +1503,30 @@
             const f = document.getElementById('import-json-file').files[0]; if(!f) return;
             const reader = new FileReader();
             reader.onload = async e => {
-                const d = JSON.parse(e.target.result);
+                let d;
+                try { d = JSON.parse(e.target.result); } catch(err) { alert('❌ Fichier JSON invalide : ' + err.message); return; }
                 if (!confirm("Cela va uploader vos données de sauvegarde vers le serveur cloud. Continuer ?")) return;
+                const errors = [];
                 if (d.factures && d.factures.length > 0) {
                     const cleanF = d.factures.map(f => ({
                         num: f.num, date: f.date, dossier: f.dossier, ht: f.ht, debours: f.debours, total: f.total,
                         payee: f.payee, date_paiement: f.date_paiement || f.datePaiement || null
                     }));
-                    await supabaseClient.from('factures').insert(cleanF);
+                    const { error } = await supabaseClient.from('factures').insert(cleanF);
+                    if (error) errors.push('Factures : ' + error.message);
                 }
                 if (d.frais && d.frais.length > 0) {
                     const cleanFr = d.frais.map(f => ({ date: f.date, type: f.type, montant: f.montant, dossier: f.dossier || '' }));
-                    await supabaseClient.from('frais').insert(cleanFr);
+                    const { error } = await supabaseClient.from('frais').insert(cleanFr);
+                    if (error) errors.push('Frais : ' + error.message);
                 }
                 if (d.charges && d.charges.length > 0) {
                     const cleanC = d.charges.map(c => ({ date: c.date, type: c.type, notes: c.notes || '', statut: c.statut, montant: c.montant }));
-                    await supabaseClient.from('charges').insert(cleanC);
+                    const { error } = await supabaseClient.from('charges').insert(cleanC);
+                    if (error) errors.push('Charges : ' + error.message);
                 }
+                document.getElementById('import-json-file').value = '';
+                if (errors.length > 0) { alert('❌ Erreurs lors de l\'importation :\n' + errors.join('\n')); return; }
                 alert("Importation terminée !"); await saveData();
             };
             reader.readAsText(f);
@@ -1522,7 +1546,9 @@
                     }
                 });
                 if (toInsert.length > 0) {
-                    await supabaseClient.from('factures').insert(toInsert);
+                    const { error } = await supabaseClient.from('factures').insert(toInsert);
+                    document.getElementById('import-csv-file').value = '';
+                    if (error) { alert('❌ Erreur Supabase : ' + error.message); return; }
                     alert(`${toInsert.length} facture(s) importée(s) avec succès !`);
                     await saveData();
                 } else { alert("Aucune ligne valide trouvée dans le fichier CSV."); }
