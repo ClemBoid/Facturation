@@ -81,7 +81,7 @@
         
         .multi-select-container { position: relative; display: inline-block; min-width: 200px; }
         .multi-select-button { padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--card-bg); cursor: pointer; text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text); }
-        .multi-select-dropdown { display: none; position: absolute; background-color: var(--card-bg); min-width: 200px; width: 100%; max-height: 250px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 10; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; }
+        .multi-select-dropdown { display: none; position: absolute; background-color: var(--card-bg); min-width: 200px; width: 100%; max-height: 250px; overflow-y: auto; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1000; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; }
         .multi-select-dropdown label { display: block; padding: 8px 10px; cursor: pointer; font-weight: normal; margin: 0; font-size: 13px; }
         .multi-select-dropdown label:hover { background-color: #f1f2f6; }
         .multi-select-dropdown input[type="checkbox"] { margin-right: 8px; cursor: pointer; }
@@ -352,6 +352,18 @@
     </div>
 
     <div id="factures" class="section active">
+        <div style="background:#eaf2f8; border:1px solid #85c1e9; padding:10px 15px; border-radius:6px; margin-bottom:15px; display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:bold; cursor:pointer; margin:0;">
+                <input type="checkbox" id="tva-active" onchange="toggleTVA()"> Soumis à la TVA
+            </label>
+            <div id="tva-rate-group" style="display:none; align-items:center; gap:8px;">
+                <label for="tva-taux" style="font-weight:normal; margin:0;">Taux :</label>
+                <input type="number" id="tva-taux" value="20" min="0" max="100" step="0.1" style="width:70px;" onchange="saveTVASettings(); calcTotal()">
+                <span>%</span>
+            </div>
+            <span id="tva-status-text" style="font-size:12px; color:#666;">TVA non applicable — les montants sont HT</span>
+        </div>
+
         <h2 id="form-title-fac">Créer une Facture</h2>
         <form onsubmit="saveFacture(event)">
             <div class="form-grid">
@@ -363,8 +375,9 @@
                     <datalist id="dossier-list"><option value="WT AVOCATS"></option></datalist>
                 </div>
                 <div class="form-group"><label>Honoraires HT (€)</label><input type="number" step="0.01" id="fac-ht" oninput="calcTotal()" required=""></div>
+                <div class="form-group" id="fac-tva-group" style="display:none;"><label>TVA (<span id="tva-taux-label">20</span>%)</label><input type="text" id="fac-tva" readonly style="background:transparent; border:1px solid var(--border); color:var(--accent); font-weight:bold;"></div>
                 <div class="form-group"><label>Débours (€)</label><input type="number" step="0.01" id="fac-debours" oninput="calcTotal()" value="0" required=""></div>
-                <div class="form-group"><label>Total Facturé</label><input type="text" id="fac-total" readonly="" style="background:transparent; border:1px solid transparent; font-weight:bold;"></div>
+                <div class="form-group"><label>Total TTC (€)</label><input type="text" id="fac-total" readonly="" style="background:transparent; border:1px solid transparent; font-weight:bold;"></div>
                 <div class="form-group"><label>Statut</label>
                     <select id="fac-payee">
                         <option value="NON">Impayée ❌</option>
@@ -412,8 +425,9 @@
                         <th onclick="sortTableFac(&#39;date&#39;)">Date <span class="sort-icon" id="sort-fac-date"></span></th>
                         <th onclick="sortTableFac(&#39;dossier&#39;)">Dossier <span class="sort-icon" id="sort-fac-dossier"></span></th>
                         <th onclick="sortTableFac(&#39;ht&#39;)">HT <span class="sort-icon" id="sort-fac-ht"></span></th>
+                        <th onclick="sortTableFac(&#39;tva_montant&#39;)">TVA <span class="sort-icon" id="sort-fac-tva"></span></th>
                         <th onclick="sortTableFac(&#39;debours&#39;)">Débours <span class="sort-icon" id="sort-fac-debours"></span></th>
-                        <th onclick="sortTableFac(&#39;total&#39;)">Total <span class="sort-icon" id="sort-fac-total"></span></th>
+                        <th onclick="sortTableFac(&#39;total&#39;)">Total TTC <span class="sort-icon" id="sort-fac-total"></span></th>
                         <th onclick="sortTableFac(&#39;payee&#39;)">Statut <span class="sort-icon" id="sort-fac-payee"></span></th>
                         <th onclick="sortTableFac('date_paiement')">Date Paiement <span class="sort-icon" id="sort-fac-date_paiement"></span></th>
                         <th class="action-col">Action</th>
@@ -443,9 +457,10 @@
                 <tfoot id="factures-foot" style="font-weight: bold; background: rgb(236, 240, 241); display: table-row-group; color: rgb(51, 51, 51);">
                     <tr>
                         <td colspan="3" style="text-align: right;">TOTAL AFFICHE :</td>
-                        <td id="tot-aff-ht">6.200,00 €</td>
-                        <td id="tot-aff-deb">0,00 €</td>
-                        <td id="tot-aff-ttc">6.200,00 €</td>
+                        <td id="tot-aff-ht"></td>
+                        <td id="tot-aff-tva"></td>
+                        <td id="tot-aff-deb"></td>
+                        <td id="tot-aff-ttc"></td>
                         <td colspan="3" class="action-col"></td>
                     </tr>
                 </tfoot>
@@ -726,6 +741,33 @@
 
         // ETATS
         let editingIdFac = null, editingIdFrais = null, editingIdCharge = null;
+        let tvaSoumisTVA = false, tvaTaux = 20;
+
+        function loadTVASettings() {
+            tvaSoumisTVA = localStorage.getItem('tvaSoumis') === '1';
+            tvaTaux = parseFloat(localStorage.getItem('tvaTaux') || '20');
+            document.getElementById('tva-active').checked = tvaSoumisTVA;
+            document.getElementById('tva-taux').value = tvaTaux;
+            updateTVADisplay();
+        }
+        function toggleTVA() {
+            tvaSoumisTVA = document.getElementById('tva-active').checked;
+            localStorage.setItem('tvaSoumis', tvaSoumisTVA ? '1' : '0');
+            updateTVADisplay(); calcTotal();
+        }
+        function saveTVASettings() {
+            tvaTaux = parseFloat(document.getElementById('tva-taux').value) || 20;
+            localStorage.setItem('tvaTaux', tvaTaux.toString());
+            document.getElementById('tva-taux-label').innerText = tvaTaux;
+        }
+        function updateTVADisplay() {
+            document.getElementById('tva-rate-group').style.display = tvaSoumisTVA ? 'flex' : 'none';
+            document.getElementById('fac-tva-group').style.display = tvaSoumisTVA ? 'block' : 'none';
+            document.getElementById('tva-taux-label').innerText = tvaTaux;
+            document.getElementById('tva-status-text').innerText = tvaSoumisTVA
+                ? `TVA ${tvaTaux}% active — le total inclut la TVA`
+                : 'TVA non applicable — les montants sont HT';
+        }
         let bilanChartInst = null, chargesChartInst = null, structureChartInst = null;
         let sortColFac = 'date', sortAscFac = false;
         let sortColFrais = 'date', sortAscFrais = false;
@@ -777,6 +819,7 @@
         function showApp() {
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
+            loadTVASettings();
         }
 
         document.getElementById('login-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
@@ -1021,7 +1064,26 @@
             document.getElementById('fac-num').value = `${year}-${(maxNum + 1).toString().padStart(3, '0')}`;
         }
 
-        function toggleDossierDropdown(e) { const d = document.getElementById('dossier-dropdown'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
+        function positionDossierDropdown() {
+            const d = document.getElementById('dossier-dropdown');
+            const btn = document.getElementById('dossier-select-btn');
+            if (!btn || d.style.display !== 'block') return;
+            const rect = btn.getBoundingClientRect();
+            d.style.top = rect.bottom + 'px';
+            d.style.left = rect.left + 'px';
+            d.style.width = rect.width + 'px';
+        }
+
+        function toggleDossierDropdown(e) {
+            const d = document.getElementById('dossier-dropdown');
+            if (d.style.display === 'block') { d.style.display = 'none'; return; }
+            d.style.position = 'fixed';
+            d.style.zIndex = '9999';
+            d.style.display = 'block';
+            positionDossierDropdown();
+        }
+
+        window.addEventListener('scroll', positionDossierDropdown, true);
         function toggleAllDossiers(source) { document.querySelectorAll('.dossier-cb').forEach(cb => cb.checked = source.checked); updateDossierButtonText(); renderFactures(); }
         function handleDossierCheck() { updateDossierButtonText(); renderFactures(); }
 
@@ -1075,8 +1137,11 @@
         }
 
         function calcTotal() {
-            const ht = parseFloat(document.getElementById('fac-ht').value) || 0, deb = parseFloat(document.getElementById('fac-debours').value) || 0;
-            document.getElementById('fac-total').value = formatMoney(ht + deb) + ' €';
+            const ht = parseFloat(document.getElementById('fac-ht').value) || 0;
+            const deb = parseFloat(document.getElementById('fac-debours').value) || 0;
+            const tva = tvaSoumisTVA ? Math.round(ht * tvaTaux) / 100 : 0;
+            document.getElementById('fac-tva').value = tvaSoumisTVA ? formatMoney(tva) + ' €' : '';
+            document.getElementById('fac-total').value = formatMoney(ht + tva + deb) + ' €';
         }
 
         async function saveFacture(e) {
@@ -1084,9 +1149,12 @@
             const btn = document.getElementById('submit-btn-fac');
             const origText = btn.innerText; btn.disabled = true; btn.innerText = '⏳ Enregistrement...';
             const ht = parseFloat(document.getElementById('fac-ht').value), deb = parseFloat(document.getElementById('fac-debours').value);
+            const tva_montant = tvaSoumisTVA ? Math.round(ht * tvaTaux) / 100 : 0;
             const factureData = {
                 num: document.getElementById('fac-num').value, date: document.getElementById('fac-date').value,
-                dossier: document.getElementById('fac-dossier').value, ht: ht, debours: deb, total: ht + deb,
+                dossier: document.getElementById('fac-dossier').value, ht: ht, debours: deb,
+                tva_taux: tvaSoumisTVA ? tvaTaux : 0, tva_montant: tva_montant,
+                total: ht + tva_montant + deb,
                 payee: document.getElementById('fac-payee').value,
                 date_paiement: document.getElementById('fac-date-paiement').value || null
             };
@@ -1112,6 +1180,7 @@
             document.getElementById('fac-dossier').value = f.dossier; document.getElementById('fac-ht').value = f.ht;
             document.getElementById('fac-debours').value = f.debours; document.getElementById('fac-payee').value = f.payee;
             document.getElementById('fac-date-paiement').value = f.date_paiement || '';
+            if (f.tva_taux > 0) { tvaSoumisTVA = true; tvaTaux = f.tva_taux; document.getElementById('tva-active').checked = true; document.getElementById('tva-taux').value = tvaTaux; updateTVADisplay(); }
             calcTotal(); window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1183,14 +1252,15 @@
                 if (valA < valB) return sortAscFac ? -1 : 1; if (valA > valB) return sortAscFac ? 1 : -1; return 0;
             });
 
-            let sumHT = 0, sumDeb = 0, sumTotal = 0;
+            let sumHT = 0, sumTVA = 0, sumDeb = 0, sumTotal = 0;
             filtered.forEach(f => {
-                sumHT += f.ht; sumDeb += f.debours; sumTotal += f.total;
+                sumHT += f.ht; sumTVA += (f.tva_montant || 0); sumDeb += f.debours; sumTotal += f.total;
                 const bg = f.payee === 'OUI' ? '#d4edda' : '#f8d7da', col = f.payee === 'OUI' ? '#155724' : '#721c24';
                 const dBg = f.date_paiement ? 'transparent' : 'rgba(0,0,0,0.05)', dCol = f.date_paiement ? 'inherit' : '#6c757d';
+                const tvaLabel = f.tva_montant > 0 ? `<span style="color:var(--accent)">${formatMoney(f.tva_montant)} €</span>` : '<span style="color:#aaa">—</span>';
                 tbody.innerHTML += `<tr>
                     <td><b>${f.num}</b></td><td>${formatDateFR(f.date)}</td><td>${f.dossier}</td>
-                    <td>${formatMoney(f.ht)} €</td><td>${formatMoney(f.debours)} €</td><td><b>${formatMoney(f.total)} €</b></td>
+                    <td>${formatMoney(f.ht)} €</td><td>${tvaLabel}</td><td>${formatMoney(f.debours)} €</td><td><b>${formatMoney(f.total)} €</b></td>
                     <td><select class="status-select" onchange="updateStatus(${f.id}, this.value)" style="background: ${bg}; color: ${col}; border: 1px solid ${col};"><option value="OUI" ${f.payee === 'OUI' ? 'selected' : ''}>Payée ✅</option><option value="NON" ${f.payee === 'NON' ? 'selected' : ''}>Impayée ❌</option></select></td>
                     <td><input type="date" value="${f.date_paiement || ''}" onchange="updateDate(${f.id}, this.value)" style="background: ${dBg}; color: ${dCol}; border: 1px solid var(--border); border-radius: 4px; padding: 5px; width: 110px;"></td>
                     <td class="action-col action-cell">
@@ -1202,8 +1272,11 @@
             });
             const tfoot = document.getElementById('factures-foot');
             if(filtered.length > 0) {
-                tfoot.style.display = "table-row-group"; document.getElementById('tot-aff-ht').innerText = formatMoney(sumHT) + " €";
-                document.getElementById('tot-aff-deb').innerText = formatMoney(sumDeb) + " €"; document.getElementById('tot-aff-ttc').innerText = formatMoney(sumTotal) + " €";
+                tfoot.style.display = "table-row-group";
+                document.getElementById('tot-aff-ht').innerText = formatMoney(sumHT) + " €";
+                document.getElementById('tot-aff-tva').innerText = sumTVA > 0 ? formatMoney(sumTVA) + " €" : "—";
+                document.getElementById('tot-aff-deb').innerText = formatMoney(sumDeb) + " €";
+                document.getElementById('tot-aff-ttc').innerText = formatMoney(sumTotal) + " €";
             } else tfoot.style.display = "none";
         }
 
@@ -1514,8 +1587,11 @@
 
             // 1. Feuille Factures
             const dataFac = factures.map(f => ({
-                "N° Facture": f.num, "Date": formatDateFR(f.date), "Dossier": f.dossier, "Honoraires HT (€)": f.ht, "Débours (€)": f.debours,
-                "Total (€)": f.total, "Statut": f.payee === 'OUI' ? 'Payée' : 'Impayée', "Date Paiement": formatDateFR(f.date_paiement)
+                "N° Facture": f.num, "Date": formatDateFR(f.date), "Dossier": f.dossier,
+                "Honoraires HT (€)": f.ht,
+                "TVA %": f.tva_taux || 0, "TVA (€)": f.tva_montant || 0,
+                "Débours (€)": f.debours, "Total TTC (€)": f.total,
+                "Statut": f.payee === 'OUI' ? 'Payée' : 'Impayée', "Date Paiement": formatDateFR(f.date_paiement)
             }));
             const wsFac = XLSX.utils.json_to_sheet(dataFac.length ? dataFac : [{ "Message": "Aucune facture" }]);
             XLSX.utils.book_append_sheet(wb, wsFac, "Factures");
