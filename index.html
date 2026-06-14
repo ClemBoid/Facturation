@@ -114,7 +114,7 @@
         }
         .print-title { display: none; }
     </style>
-<link rel="manifest" href="blob:null/6aa0073f-095c-40a3-8469-6d1b09747fdf"></head>
+</head>
 <body>
 
     <!-- ÉCRAN DE CONNEXION -->
@@ -134,6 +134,7 @@
         <div style="display: flex; align-items: center; gap: 15px;">
             <h1 style="margin:0; font-size: 20px;">⚖️ Gestion du Cabinet (Cloud)</h1>
             <button onclick="toggleDarkMode()" style="background:none; border:none; cursor:pointer; font-size: 22px; padding:0;" title="Basculer le mode sombre">🌗</button>
+            <span id="sync-indicator" style="font-size: 11px; color: rgba(255,255,255,0.55);"></span>
         </div>
         <div class="nav-buttons">
             <button onclick="showSection(&#39;factures&#39;)">Factures</button>
@@ -697,6 +698,16 @@
             <input type="file" id="import-csv-file" accept=".csv" style="color:var(--text);">
             <button class="btn btn-warning" onclick="importCSV()">Importer les factures Excel</button>
         </div>
+
+        <div class="data-management" style="background: #f4ecf7; border-color: var(--purple);">
+            <h3 style="color:var(--text);">3. Changer le mot de passe</h3>
+            <p style="font-size: 13px; color:var(--text);">Entrez deux fois votre nouveau mot de passe pour confirmer.</p>
+            <div style="display: flex; flex-direction: column; gap: 10px; max-width: 300px;">
+                <input type="password" id="new-pwd-1" placeholder="Nouveau mot de passe" style="padding:10px; border:1px solid var(--border); border-radius:4px;">
+                <input type="password" id="new-pwd-2" placeholder="Confirmer le mot de passe" style="padding:10px; border:1px solid var(--border); border-radius:4px;">
+                <button class="btn btn-print" id="change-pwd-btn" onclick="changePassword()">Changer le mot de passe</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -721,7 +732,7 @@
         let sortColCharges = 'date', sortAscCharges = false;
 
         // --- AUTH SUPABASE (mot de passe uniquement, email fixé) ---
-        const APP_EMAIL = 'cboidin.avocat@gmail.com';
+        const APP_EMAIL = 'clement.boidin@gmail.com';
 
         async function checkSession() {
             const { data } = await supabaseClient.auth.getSession();
@@ -736,7 +747,9 @@
             const { error } = await supabaseClient.auth.signInWithPassword({ email: APP_EMAIL, password: pwd });
             btn.disabled = false; btn.innerText = 'Se connecter';
             if (error) {
-                document.getElementById('auth-error').style.display = 'block';
+                const errEl = document.getElementById('auth-error');
+                errEl.innerText = error.message;
+                errEl.style.display = 'block';
             } else {
                 showApp();
                 loadDataFromServer();
@@ -745,12 +758,35 @@
 
         async function logout() { await supabaseClient.auth.signOut(); location.reload(); }
 
+        async function changePassword() {
+            const p1 = document.getElementById('new-pwd-1').value;
+            const p2 = document.getElementById('new-pwd-2').value;
+            if (!p1) { alert('Veuillez saisir un nouveau mot de passe.'); return; }
+            if (p1.length < 6) { alert('Le mot de passe doit contenir au moins 6 caractères.'); return; }
+            if (p1 !== p2) { alert('Les deux mots de passe ne correspondent pas.'); return; }
+            const btn = document.getElementById('change-pwd-btn');
+            btn.disabled = true; btn.innerText = 'Modification...';
+            const { error } = await supabaseClient.auth.updateUser({ password: p1 });
+            btn.disabled = false; btn.innerText = 'Changer le mot de passe';
+            if (error) { alert('❌ Erreur : ' + error.message); return; }
+            document.getElementById('new-pwd-1').value = '';
+            document.getElementById('new-pwd-2').value = '';
+            alert('Mot de passe modifié avec succès !');
+        }
+
         function showApp() {
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
         }
 
         document.getElementById('login-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+        supabaseClient.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT' && document.getElementById('app-content').style.display !== 'none') {
+                alert('Votre session a expiré. Veuillez vous reconnecter.');
+                location.reload();
+            }
+        });
 
         checkSession();
 
@@ -767,9 +803,18 @@
                 supabaseClient.from('frais').select('*').order('date', { ascending: false }),
                 supabaseClient.from('charges').select('*').order('date', { ascending: false })
             ]);
+            const loadErr = fRes.error || frRes.error || cRes.error;
+            if (loadErr) {
+                const isAuthErr = loadErr.code === 'PGRST301' || (loadErr.message && loadErr.message.toLowerCase().includes('jwt'));
+                if (isAuthErr) { alert('Session expirée. Reconnexion...'); await supabaseClient.auth.signOut(); location.reload(); return; }
+                alert('❌ Erreur de chargement : ' + loadErr.message);
+                return;
+            }
             if (fRes.data) factures = fRes.data;
             if (frRes.data) frais = frRes.data;
             if (cRes.data) charges = cRes.data;
+            const syncEl = document.getElementById('sync-indicator');
+            if (syncEl) syncEl.innerText = '● sync ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
 
             document.getElementById('fac-date').valueAsDate = new Date();
             document.getElementById('frais-date').valueAsDate = new Date();
@@ -1094,17 +1139,20 @@
             let dateP = f.date_paiement;
             if (value === 'OUI' && !dateP) dateP = new Date().toISOString().split('T')[0];
             else if (value === 'NON') dateP = null;
-            await supabaseClient.from('factures').update({ payee: value, date_paiement: dateP }).eq('id', id);
+            const { error } = await supabaseClient.from('factures').update({ payee: value, date_paiement: dateP }).eq('id', id);
+            if (error) { alert('❌ Erreur : ' + error.message); await saveData(); return; }
             await saveData();
         }
         async function updateDate(id, value) {
-            await supabaseClient.from('factures').update({ date_paiement: value || null, payee: value ? 'OUI' : 'NON' }).eq('id', id);
+            const { error } = await supabaseClient.from('factures').update({ date_paiement: value || null, payee: value ? 'OUI' : 'NON' }).eq('id', id);
+            if (error) { alert('❌ Erreur : ' + error.message); await saveData(); return; }
             await saveData();
         }
 
         async function deleteFacture(id) {
             if(confirm("Supprimer cette facture du serveur ?")) {
-                await supabaseClient.from('factures').delete().eq('id', id);
+                const { error } = await supabaseClient.from('factures').delete().eq('id', id);
+                if (error) { alert('❌ Erreur : ' + error.message); return; }
                 if(editingIdFac === id) cancelEditFac();
                 await saveData();
             }
@@ -1208,7 +1256,8 @@
 
         async function deleteFrais(id) {
             if(confirm("Supprimer ce frais du serveur ?")) {
-                await supabaseClient.from('frais').delete().eq('id', id);
+                const { error } = await supabaseClient.from('frais').delete().eq('id', id);
+                if (error) { alert('❌ Erreur : ' + error.message); return; }
                 if(editingIdFrais === id) cancelEditFrais();
                 await saveData();
             }
@@ -1320,14 +1369,16 @@
 
         async function deleteCharge(id) {
             if(confirm("Supprimer cette charge du serveur ?")) {
-                await supabaseClient.from('charges').delete().eq('id', id);
+                const { error } = await supabaseClient.from('charges').delete().eq('id', id);
+                if (error) { alert('❌ Erreur : ' + error.message); return; }
                 if(editingIdCharge === id) cancelEditCharge();
                 await saveData();
             }
         }
 
         async function updateChargeStatus(id, value) {
-            await supabaseClient.from('charges').update({ statut: value }).eq('id', id);
+            const { error } = await supabaseClient.from('charges').update({ statut: value }).eq('id', id);
+            if (error) { alert('❌ Erreur : ' + error.message); await saveData(); return; }
             await saveData();
         }
 
@@ -1505,8 +1556,13 @@
             reader.onload = async e => {
                 let d;
                 try { d = JSON.parse(e.target.result); } catch(err) { alert('❌ Fichier JSON invalide : ' + err.message); return; }
-                if (!confirm("Cela va uploader vos données de sauvegarde vers le serveur cloud. Continuer ?")) return;
+                const replace = confirm("Voulez-vous REMPLACER toutes les données existantes par celles de la sauvegarde ?\n\nOK = Remplacer (recommandé pour restaurer)\nAnnuler = Annuler l'import");
+                if (!replace) return;
                 const errors = [];
+                // Vider les tables avant d'importer pour éviter les doublons
+                await supabaseClient.from('factures').delete().not('id', 'is', null);
+                await supabaseClient.from('frais').delete().not('id', 'is', null);
+                await supabaseClient.from('charges').delete().not('id', 'is', null);
                 if (d.factures && d.factures.length > 0) {
                     const cleanF = d.factures.map(f => ({
                         num: f.num, date: f.date, dossier: f.dossier, ht: f.ht, debours: f.debours, total: f.total,
