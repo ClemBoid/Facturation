@@ -142,6 +142,7 @@
             <button onclick="showSection(&#39;charges&#39;)">Charges</button>
             <button onclick="showSection(&#39;dossiers&#39;)" style="background-color: #8e44ad;">📂 Dossiers</button>
             <button onclick="showSection(&#39;analyse&#39;)" style="background-color: #e67e22;">📊 Analyse</button>
+            <button onclick="showSection(&#39;conges&#39;)" style="background-color:#16a085;">🏖️ Congés</button>
             <button onclick="showSection(&#39;sauvegarde&#39;)">Sauvegarde</button>
             <button onclick="logout()" style="background-color: transparent; border: 1px solid white; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">Déconnexion</button>
         </div>
@@ -687,6 +688,86 @@
         </div>
     </div>
 
+    <div id="conges" class="section">
+        <h2>🏖️ Congés</h2>
+
+        <div id="conges-annees-tabs" style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center;"></div>
+
+        <div id="conges-new-annee-form" style="display:none; background:#eafaf1; border:1px solid #82e0aa; padding:15px; border-radius:6px; margin-bottom:20px;">
+            <h3 style="margin-top:0; color:var(--primary);">Configurer une nouvelle année</h3>
+            <div class="form-grid">
+                <div class="form-group"><label>Année</label><input type="number" id="new-annee-year" min="2020" max="2040"></div>
+                <div class="form-group"><label>Début de période</label><input type="date" id="new-annee-debut"></div>
+                <div class="form-group"><label>Fin de période</label><input type="date" id="new-annee-fin"></div>
+                <div class="form-group"><label>Jours attribués</label><input type="number" id="new-annee-jours" value="30" step="0.5" min="0"></div>
+            </div>
+            <button class="btn btn-success" onclick="saveNewAnnee()">Créer l'année</button>
+            <button class="btn btn-warning" onclick="document.getElementById('conges-new-annee-form').style.display='none'" style="margin-left:8px;">Annuler</button>
+        </div>
+
+        <div id="conges-year-view" style="display:none;">
+            <div id="conges-config-card" style="background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:15px;"></div>
+            <div class="dashboard" id="conges-dashboard" style="margin-bottom:20px;"></div>
+
+            <!-- CALENDRIER -->
+            <h3 style="margin-bottom:10px;">Calendrier</h3>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap;">
+                <button class="btn btn-info" onclick="changeCalendarMonth(-1)" style="padding:6px 12px;">◀</button>
+                <strong id="calendar-month-label" style="min-width:160px; text-align:center; font-size:15px;"></strong>
+                <button class="btn btn-info" onclick="changeCalendarMonth(1)" style="padding:6px 12px;">▶</button>
+            </div>
+            <div id="conges-calendar" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; max-width:460px; margin-bottom:10px;"></div>
+            <div style="display:flex; gap:15px; margin-bottom:20px; font-size:12px; flex-wrap:wrap;">
+                <span style="display:flex; align-items:center; gap:5px;"><span style="background:#27ae60; color:white; padding:2px 8px; border-radius:4px;">J</span> Journée (1 j)</span>
+                <span style="display:flex; align-items:center; gap:5px;"><span style="background:#3498db; color:white; padding:2px 8px; border-radius:4px;">M</span> Matin (0,5 j)</span>
+                <span style="display:flex; align-items:center; gap:5px;"><span style="background:#e67e22; color:white; padding:2px 8px; border-radius:4px;">PM</span> Après-midi (0,5 j)</span>
+                <span style="display:flex; align-items:center; gap:5px;"><span style="background:#f39c12; color:white; padding:2px 8px; border-radius:4px;">O</span> Offerte cabinet (non décomptée)</span>
+                <span style="color:#aaa;">Clic pour cycler : vide → J → M → PM → O → vide</span>
+            </div>
+
+            <h3>Ajouter une période manuellement</h3>
+            <form onsubmit="addCongesEntree(event)" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:20px;">
+                <div class="form-group" style="flex:1; min-width:200px;"><label>Période (description)</label><input type="text" id="conges-periode" placeholder="ex: 15 au 20 août" required></div>
+                <div class="form-group" style="width:130px;"><label>Nb jours</label><input type="number" id="conges-nb-jours" step="0.5" min="0" required></div>
+                <div class="form-group" style="width:auto; align-self:flex-end; padding-bottom:8px;">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;white-space:nowrap;font-weight:normal;">
+                        <input type="checkbox" id="conges-offert" onchange="toggleOffertMode()">
+                        <span>🎁 Offerte par le cabinet <span style="color:#aaa;font-size:11px;">(non décomptée)</span></span>
+                    </label>
+                </div>
+                <div class="form-group" style="flex:1; min-width:160px;"><label>Commentaire <span style="color:#aaa; font-weight:normal;">(optionnel)</span></label><input type="text" id="conges-commentaire" placeholder="ex: Noël, RTT..."></div>
+                <div style="display:flex; gap:8px; padding-bottom:1px;">
+                    <button type="submit" class="btn btn-success" id="conges-submit-btn">Ajouter</button>
+                    <button type="button" class="btn btn-warning" id="conges-cancel-btn" style="display:none;" onclick="cancelEditConges()">Annuler</button>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table>
+                    <thead><tr>
+                        <th>Période</th>
+                        <th style="text-align:center; width:100px;">Nb jours</th>
+                        <th>Commentaire</th>
+                        <th class="action-col">Action</th>
+                    </tr></thead>
+                    <tbody id="conges-body"></tbody>
+                    <tfoot id="conges-foot" style="display:none; font-weight:bold; background:rgb(236,240,241);">
+                        <tr>
+                            <td>TOTAL POSÉ</td>
+                            <td style="text-align:center;" id="conges-total-pose"></td>
+                            <td></td>
+                            <td class="action-col"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div id="conges-empty" style="text-align:center; color:#aaa; padding:40px; display:none;">
+            Aucune année configurée. Cliquez sur <b>+ Nouvelle année</b> pour commencer.
+        </div>
+    </div>
+
     <div id="sauvegarde" class="section">
         <h2>💾 Sauvegarde &amp; Importation</h2>
         
@@ -965,6 +1046,7 @@
             await loadDataFromServer();
             if (document.getElementById('analyse').classList.contains('active')) updateAnalyse();
             if (document.getElementById('dossiers').classList.contains('active')) renderBilanDossier();
+            if (document.getElementById('conges').classList.contains('active')) await loadCongesData();
             checkAlerts();
         }
 
@@ -976,6 +1058,7 @@
             if(id === 'factures') updateDashboard();
             if(id === 'analyse') updateAnalyse();
             if(id === 'dossiers') { updateDossiersList(); renderBilanDossier(); }
+            if(id === 'conges') loadCongesData();
         }
 
         function printTable(type) {
@@ -1686,6 +1769,419 @@
                 } else { alert("Aucune ligne valide trouvée dans le fichier CSV."); }
             };
             reader.readAsText(f);
+        }
+
+        // ==========================
+        // GESTION CONGÉS
+        // ==========================
+        let congesConfig = [], congesEntrees = [], currentAnneeConges = null, editingIdConges = null;
+        let calendarYear = null, calendarMonth = null;
+
+        async function loadCongesData() {
+            const [cfgRes, entRes] = await Promise.all([
+                supabaseClient.from('conges_config').select('*').order('annee'),
+                supabaseClient.from('conges_entrees').select('*').order('id')
+            ]);
+            if (cfgRes.error || entRes.error) return;
+            congesConfig = cfgRes.data || [];
+            congesEntrees = entRes.data || [];
+            if (congesConfig.length > 0 && !currentAnneeConges)
+                currentAnneeConges = congesConfig[congesConfig.length - 1].annee;
+            renderCongesAnneesTabs();
+            renderCongesYearView();
+        }
+
+        function getReportVers(annee) {
+            const prevCfg = congesConfig.find(c => c.annee === annee - 1);
+            if (!prevCfg) return 0;
+            const prevTaken = congesEntrees.filter(e => e.annee === annee - 1).reduce((a, e) => a + parseFloat(e.nb_jours), 0);
+            return Math.max(0, parseFloat(prevCfg.jours_attribues) + getReportVers(annee - 1) - prevTaken);
+        }
+
+        function renderCongesAnneesTabs() {
+            const div = document.getElementById('conges-annees-tabs'); if (!div) return;
+            div.innerHTML = '';
+            congesConfig.forEach(cfg => {
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.style.cssText = `background:${cfg.annee === currentAnneeConges ? 'var(--primary)' : 'var(--accent)'}; color:white; padding:8px 16px;`;
+                btn.innerText = cfg.annee;
+                btn.onclick = () => { currentAnneeConges = cfg.annee; calendarYear = null; calendarMonth = null; renderCongesAnneesTabs(); renderCongesYearView(); };
+                div.appendChild(btn);
+            });
+            const addBtn = document.createElement('button');
+            addBtn.className = 'btn btn-success'; addBtn.style.padding = '8px 14px';
+            addBtn.innerText = '+ Nouvelle année'; addBtn.onclick = showNewAnneeForm;
+            div.appendChild(addBtn);
+        }
+
+        function renderCongesYearView() {
+            const emptyDiv = document.getElementById('conges-empty');
+            const yearView = document.getElementById('conges-year-view');
+            if (!congesConfig.length || !currentAnneeConges) {
+                emptyDiv.style.display = 'block'; yearView.style.display = 'none'; return;
+            }
+            emptyDiv.style.display = 'none'; yearView.style.display = 'block';
+            const cfg = congesConfig.find(c => c.annee === currentAnneeConges); if (!cfg) return;
+            const report = getReportVers(currentAnneeConges);
+            const total_dispo = parseFloat(cfg.jours_attribues) + report;
+            const entrees = congesEntrees.filter(e => e.annee === currentAnneeConges);
+            const total_pose = entrees.reduce((a, e) => a + parseFloat(e.nb_jours), 0);
+            const reste = total_dispo - total_pose;
+            const fmt = d => d ? new Date(d).toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'}) : '—';
+
+            document.getElementById('conges-config-card').innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="margin:0 0 8px 0; color:var(--primary);">Congés ${cfg.annee}</h3>
+                        <p style="margin:3px 0; font-size:13px;">Période : <b>${fmt(cfg.debut_periode)}</b> → <b>${fmt(cfg.fin_periode)}</b></p>
+                        <div style="display:flex; gap:20px; flex-wrap:wrap; margin:8px 0 4px 0;">
+                            <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 14px; text-align:center;">
+                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Jours année ${cfg.annee}</div>
+                                <div style="font-size:20px; font-weight:bold; color:var(--primary);">${cfg.jours_attribues} j</div>
+                            </div>
+                            <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 14px; text-align:center; opacity:${report > 0 ? '1' : '0.45'};">
+                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Report de ${cfg.annee-1}</div>
+                                <div style="font-size:20px; font-weight:bold; color:var(--accent);">+${report} j</div>
+                            </div>
+                            <div style="background:var(--primary); border-radius:6px; padding:8px 14px; text-align:center;">
+                                <div style="font-size:11px; color:rgba(255,255,255,0.75); margin-bottom:3px;">Total à poser</div>
+                                <div style="font-size:20px; font-weight:bold; color:white;">${total_dispo} j</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-info" onclick="toggleEditConfig()" style="font-size:12px;">✏️ Modifier</button>
+                </div>
+                <div id="conges-edit-config-form" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Début de période</label><input type="date" id="edit-cfg-debut" value="${cfg.debut_periode||''}"></div>
+                        <div class="form-group"><label>Fin de période</label><input type="date" id="edit-cfg-fin" value="${cfg.fin_periode||''}"></div>
+                        <div class="form-group"><label>Jours attribués</label><input type="number" id="edit-cfg-jours" value="${cfg.jours_attribues}" step="0.5" min="0"></div>
+                    </div>
+                    <button class="btn btn-success" onclick="saveEditConfig(${cfg.id})" style="margin-right:8px;">Enregistrer</button>
+                    <button class="btn btn-warning" onclick="toggleEditConfig()">Annuler</button>
+                </div>`;
+
+            const restColor = reste <= 0 ? 'var(--danger)' : reste < 7 ? 'var(--orange)' : 'var(--success)';
+            document.getElementById('conges-dashboard').innerHTML = `
+                <div class="card" style="border-bottom:4px solid var(--danger);"><h3>Jours posés</h3><div class="amount" style="color:var(--danger);">${total_pose} j</div></div>
+                <div class="card" style="border-bottom:4px solid ${restColor};"><h3>Jours restants</h3><div class="amount" style="color:${restColor};">${reste} j</div></div>
+                <div class="card" style="border-bottom:4px solid var(--accent);"><h3>Total disponible</h3><div class="amount" style="color:var(--accent);">${total_dispo} j</div></div>`;
+
+            const tbody = document.getElementById('conges-body'); tbody.innerHTML = '';
+            const calEntries = entrees.filter(e => e.date_calendrier);
+            const offertCalEntries = calEntries.filter(e => e.type_conge === 'offert');
+            const manualEntries = entrees.filter(e => !e.date_calendrier);
+            const offertBadge = '<span style="background:#f39c12;color:white;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:bold;">Offerte</span>';
+            const editBtn = (onclick, title) => `<button class="btn btn-info" onclick="${onclick}" title="${title}" style="font-size:13px;">✏️</button>`;
+            const delBtn  = (onclick)         => `<button class="btn btn-danger" onclick="${onclick}" title="Supprimer" style="font-size:13px;">✕</button>`;
+
+            // Collect all rows with a sortDate for chronological ordering
+            const rows = [];
+
+            groupCalendarEntries(calEntries).forEach(group => {
+                const dates = group.map(e => e.date_calendrier).sort();
+                const totalJours = group.reduce((a,e) => a + parseFloat(e.nb_jours), 0);
+                const commentaire = group[0].commentaire || '';
+                const idsStr = group.map(e => e.id).join(',');
+                let periodeLabel;
+                if (group.length === 1) {
+                    periodeLabel = formatDateFR(dates[0]);
+                    if (group[0].type_conge === 'matin') periodeLabel += ' (matin)';
+                    else if (group[0].type_conge === 'apres_midi') periodeLabel += ' (après-midi)';
+                } else {
+                    periodeLabel = `${formatDateFR(dates[0])} au ${formatDateFR(dates[dates.length-1])}`;
+                }
+                const actionEdit = group.length === 1
+                    ? editBtn(`editConges(${group[0].id})`, 'Modifier')
+                    : editBtn(`editCongesGroupComment('${idsStr}')`, 'Modifier le commentaire');
+                rows.push({ sortDate: dates[0], html: `<tr>
+                    <td>${periodeLabel}</td>
+                    <td style="text-align:center;">${totalJours} j</td>
+                    <td style="color:#666;font-size:13px;">${commentaire || '<span style="color:#ccc;">—</span>'}</td>
+                    <td class="action-col action-cell">${actionEdit}${delBtn(`deleteCongesGroupStr('${idsStr}')`)}</td></tr>` });
+            });
+
+            offertCalEntries.forEach(e => {
+                rows.push({ sortDate: e.date_calendrier, html: `<tr style="background:rgba(243,156,18,0.06);">
+                    <td>${formatDateFR(e.date_calendrier)}</td>
+                    <td style="text-align:center;">${offertBadge}</td>
+                    <td style="color:#666;font-size:13px;">${e.commentaire || '<span style="color:#ccc;">—</span>'}</td>
+                    <td class="action-col action-cell">${editBtn(`editConges(${e.id})`, 'Modifier')}${delBtn(`deleteCongesEntree(${e.id})`)}</td></tr>` });
+            });
+
+            manualEntries.forEach(e => {
+                const nbDisplay = parseFloat(e.nb_jours) === 0 ? offertBadge : parseFloat(e.nb_jours) + ' j';
+                rows.push({ sortDate: '9999', html: `<tr>
+                    <td>${e.periode}</td>
+                    <td style="text-align:center;">${nbDisplay}</td>
+                    <td style="color:#666;font-size:13px;">${e.commentaire || '<span style="color:#ccc;">—</span>'}</td>
+                    <td class="action-col action-cell">${editBtn(`editConges(${e.id})`, 'Modifier')}${delBtn(`deleteCongesEntree(${e.id})`)}</td></tr>` });
+            });
+
+            rows.sort((a,b) => a.sortDate.localeCompare(b.sortDate));
+            tbody.innerHTML = rows.map(r => r.html).join('');
+            const tfoot = document.getElementById('conges-foot');
+            tfoot.style.display = entrees.length ? 'table-row-group' : 'none';
+            document.getElementById('conges-total-pose').innerText = total_pose + ' j';
+            renderCalendar();
+        }
+
+        function getEaster(year) {
+            const a = year%19, b = Math.floor(year/100), c = year%100;
+            const d = Math.floor(b/4), e = b%4, f = Math.floor((b+8)/25);
+            const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15)%30;
+            const i = Math.floor(c/4), k = c%4, l = (32+2*e+2*i-h-k)%7;
+            const m = Math.floor((a+11*h+22*l)/451);
+            return new Date(year, Math.floor((h+l-7*m+114)/31)-1, ((h+l-7*m+114)%31)+1);
+        }
+        function isFerie(dateStr) {
+            const dt = new Date(dateStr + 'T00:00:00'), y = dt.getFullYear();
+            const easter = getEaster(y);
+            const add = (n) => { const r = new Date(easter); r.setDate(r.getDate()+n); return r; };
+            const s = (d) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+            return new Set([`${y}-01-01`,s(add(1)),`${y}-05-01`,`${y}-05-08`,s(add(39)),s(add(50)),`${y}-07-14`,`${y}-08-15`,`${y}-11-01`,`${y}-11-11`,`${y}-12-25`]).has(dateStr);
+        }
+        function groupCalendarEntries(entries) {
+            // allDates includes offert days so they bridge gaps between vacation days
+            const allDates = new Set(entries.filter(e => e.date_calendrier).map(e => e.date_calendrier));
+            const sorted = entries.filter(e => e.date_calendrier && e.type_conge !== 'offert')
+                                  .sort((a,b) => a.date_calendrier.localeCompare(b.date_calendrier));
+            if (!sorted.length) return [];
+            const groups = []; let group = [sorted[0]];
+            for (let i = 1; i < sorted.length; i++) {
+                const prev = group[group.length-1].date_calendrier, cur = sorted[i].date_calendrier;
+                let hasGap = false;
+                const d = new Date(prev + 'T00:00:00'); d.setDate(d.getDate()+1);
+                const end = new Date(cur + 'T00:00:00');
+                while (d < end) {
+                    const s = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+                    if (d.getDay()!==0 && d.getDay()!==6 && !isFerie(s) && !allDates.has(s)) { hasGap = true; break; }
+                    d.setDate(d.getDate()+1);
+                }
+                if (hasGap) { groups.push(group); group = [sorted[i]]; } else { group.push(sorted[i]); }
+            }
+            groups.push(group); return groups;
+        }
+
+        function renderCalendar() {
+            const calDiv = document.getElementById('conges-calendar');
+            const label = document.getElementById('calendar-month-label');
+            if (!calDiv || !label) return;
+            const cfg = congesConfig.find(c => c.annee === currentAnneeConges);
+            if (!cfg) return;
+
+            if (calendarYear === null) {
+                if (cfg.debut_periode) {
+                    const d = new Date(cfg.debut_periode + 'T00:00:00');
+                    calendarYear = d.getFullYear();
+                    calendarMonth = d.getMonth();
+                } else {
+                    calendarYear = currentAnneeConges;
+                    calendarMonth = 0;
+                }
+            }
+
+            const mois = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+            label.innerText = mois[calendarMonth] + ' ' + calendarYear;
+            calDiv.innerHTML = '';
+
+            ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].forEach(d => {
+                const h = document.createElement('div');
+                h.style.cssText = 'text-align:center;font-weight:bold;font-size:11px;padding:4px 2px;color:#888;';
+                h.innerText = d;
+                calDiv.appendChild(h);
+            });
+
+            let startDow = new Date(calendarYear, calendarMonth, 1).getDay();
+            if (startDow === 0) startDow = 7;
+            for (let i = 1; i < startDow; i++) calDiv.appendChild(document.createElement('div'));
+
+            const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+            const vacByDate = {};
+            congesEntrees.filter(e => e.annee === currentAnneeConges && e.date_calendrier)
+                         .forEach(e => { vacByDate[e.date_calendrier] = e; });
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = calendarYear + '-' + String(calendarMonth + 1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+                const dow = new Date(calendarYear, calendarMonth, day).getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const isHoliday = !isWeekend && isFerie(dateStr);
+                const isBlocked = isWeekend || isHoliday;
+                const vac = vacByDate[dateStr];
+                const type = vac ? vac.type_conge : null;
+
+                let bg = 'transparent', color = 'var(--text)', badge = '', border = '1px solid var(--border)', titleText = 'Cliquer pour ajouter';
+                if (isWeekend)               { color = '#bbb'; border = 'none'; }
+                else if (isHoliday)           { bg = '#fce8e8'; color = '#c0605a'; border = 'none'; badge = 'F';  titleText = 'Jour férié'; }
+                else if (type === 'plein')    { bg = '#27ae60'; color = 'white'; badge = 'J';  border = 'none'; titleText = 'Journée → cliquer pour ½ matin'; }
+                else if (type === 'matin')    { bg = '#3498db'; color = 'white'; badge = 'M';  border = 'none'; titleText = 'Matin → cliquer pour ½ après-midi'; }
+                else if (type === 'apres_midi') { bg = '#e67e22'; color = 'white'; badge = 'PM'; border = 'none'; titleText = 'Après-midi → cliquer pour journée offerte'; }
+                else if (type === 'offert')   { bg = '#f39c12'; color = 'white'; badge = 'O';  border = 'none'; titleText = 'Offerte cabinet → cliquer pour supprimer'; }
+
+                const cell = document.createElement('div');
+                cell.style.cssText = `text-align:center;padding:3px 2px;border-radius:6px;font-size:12px;background:${bg};color:${color};cursor:${isBlocked ? 'default' : 'pointer'};user-select:none;min-height:36px;display:flex;align-items:center;justify-content:center;flex-direction:column;border:${border};`;
+                if (!isBlocked) cell.title = titleText;
+                else if (isHoliday) cell.title = titleText;
+                cell.innerHTML = `<span style="font-size:13px;">${day}</span>${badge ? `<span style="font-size:9px;font-weight:bold;">${badge}</span>` : ''}`;
+                if (!isBlocked) cell.onclick = () => toggleCalendarDay(dateStr, vac ? vac.id : null, type);
+                calDiv.appendChild(cell);
+            }
+        }
+
+        function changeCalendarMonth(delta) {
+            if (calendarYear === null) { renderCalendar(); return; }
+            calendarMonth += delta;
+            if (calendarMonth < 0)  { calendarMonth = 11; calendarYear--; }
+            if (calendarMonth > 11) { calendarMonth = 0;  calendarYear++; }
+            renderCalendar();
+        }
+
+        async function toggleCalendarDay(dateStr, existingId, currentType) {
+            const dateObj = new Date(dateStr + 'T00:00:00');
+            const dayName = dateObj.toLocaleDateString('fr-FR', {day:'numeric', month:'long'});
+            let nextType, nextNbJours, nextPeriode;
+            if (!currentType)                      { nextType = 'plein';      nextNbJours = 1;   nextPeriode = dayName; }
+            else if (currentType === 'plein')      { nextType = 'matin';      nextNbJours = 0.5; nextPeriode = dayName + ' (matin)'; }
+            else if (currentType === 'matin')      { nextType = 'apres_midi'; nextNbJours = 0.5; nextPeriode = dayName + ' (après-midi)'; }
+            else if (currentType === 'apres_midi') { nextType = 'offert';     nextNbJours = 0;   nextPeriode = dayName + ' (offerte cabinet)'; }
+            else                                   { nextType = null; }
+
+            if (existingId) {
+                if (nextType === null) {
+                    const { error } = await supabaseClient.from('conges_entrees').delete().eq('id', existingId);
+                    if (error) { alert('❌ ' + error.message); return; }
+                } else {
+                    const { error } = await supabaseClient.from('conges_entrees').update({ type_conge: nextType, nb_jours: nextNbJours, periode: nextPeriode }).eq('id', existingId);
+                    if (error) { alert('❌ ' + error.message); return; }
+                }
+            } else if (nextType) {
+                const { error } = await supabaseClient.from('conges_entrees').insert([{ annee: currentAnneeConges, date_calendrier: dateStr, type_conge: nextType, nb_jours: nextNbJours, periode: nextPeriode }]);
+                if (error) { alert('❌ ' + error.message); return; }
+            }
+            const savedYear = calendarYear, savedMonth = calendarMonth;
+            await loadCongesData();
+            calendarYear = savedYear; calendarMonth = savedMonth;
+            renderCalendar();
+        }
+
+        function toggleEditConfig() {
+            const f = document.getElementById('conges-edit-config-form');
+            if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showNewAnneeForm() {
+            document.getElementById('conges-new-annee-form').style.display = 'block';
+            const max = congesConfig.length ? Math.max(...congesConfig.map(c => c.annee)) + 1 : new Date().getFullYear();
+            document.getElementById('new-annee-year').value = max;
+            document.getElementById('new-annee-debut').value = `${max}-02-12`;
+            document.getElementById('new-annee-fin').value = `${max+1}-02-11`;
+        }
+
+        async function saveNewAnnee() {
+            const annee = parseInt(document.getElementById('new-annee-year').value);
+            if (!annee) return;
+            const { error } = await supabaseClient.from('conges_config').insert([{
+                annee, debut_periode: document.getElementById('new-annee-debut').value || null,
+                fin_periode: document.getElementById('new-annee-fin').value || null,
+                jours_attribues: parseFloat(document.getElementById('new-annee-jours').value) || 0
+            }]);
+            if (error) { alert('❌ Erreur : ' + error.message); return; }
+            document.getElementById('conges-new-annee-form').style.display = 'none';
+            currentAnneeConges = annee;
+            await loadCongesData();
+        }
+
+        async function saveEditConfig(id) {
+            const { error } = await supabaseClient.from('conges_config').update({
+                debut_periode: document.getElementById('edit-cfg-debut').value || null,
+                fin_periode: document.getElementById('edit-cfg-fin').value || null,
+                jours_attribues: parseFloat(document.getElementById('edit-cfg-jours').value) || 0
+            }).eq('id', id);
+            if (error) { alert('❌ Erreur : ' + error.message); return; }
+            await loadCongesData();
+        }
+
+        async function addCongesEntree(e) {
+            e.preventDefault();
+            const btn = document.getElementById('conges-submit-btn');
+            const orig = btn.innerText; btn.disabled = true; btn.innerText = '⏳...';
+            const isOffert = document.getElementById('conges-offert').checked;
+            const nb_jours = isOffert ? 0 : parseFloat(document.getElementById('conges-nb-jours').value);
+            const data = { annee: currentAnneeConges, periode: document.getElementById('conges-periode').value, nb_jours, commentaire: document.getElementById('conges-commentaire').value.trim() || null };
+            const result = editingIdConges
+                ? await supabaseClient.from('conges_entrees').update({ periode: data.periode, nb_jours: data.nb_jours, commentaire: data.commentaire }).eq('id', editingIdConges)
+                : await supabaseClient.from('conges_entrees').insert([data]);
+            btn.disabled = false; btn.innerText = orig;
+            if (result.error) { alert('❌ Erreur : ' + result.error.message); return; }
+            cancelEditConges(); e.target.reset();
+            await loadCongesData();
+        }
+
+        function editConges(id) {
+            const e = congesEntrees.find(x => x.id === id); if (!e) return;
+            editingIdConges = id;
+            document.getElementById('conges-periode').value = e.periode;
+            const isOffert = parseFloat(e.nb_jours) === 0;
+            document.getElementById('conges-offert').checked = isOffert;
+            const nbField = document.getElementById('conges-nb-jours');
+            nbField.disabled = isOffert; nbField.required = !isOffert;
+            nbField.value = isOffert ? '' : e.nb_jours;
+            document.getElementById('conges-commentaire').value = e.commentaire || '';
+            document.getElementById('conges-submit-btn').innerText = 'Enregistrer';
+            document.getElementById('conges-cancel-btn').style.display = 'inline-flex';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelEditConges() {
+            editingIdConges = null;
+            document.getElementById('conges-submit-btn').innerText = 'Ajouter';
+            document.getElementById('conges-cancel-btn').style.display = 'none';
+            document.getElementById('conges-periode').value = '';
+            const nbField = document.getElementById('conges-nb-jours');
+            nbField.value = ''; nbField.disabled = false; nbField.required = true;
+            document.getElementById('conges-commentaire').value = '';
+            document.getElementById('conges-offert').checked = false;
+        }
+
+        async function deleteCongesEntree(id) {
+            if (!confirm('Supprimer cette entrée ?')) return;
+            const { error } = await supabaseClient.from('conges_entrees').delete().eq('id', id);
+            if (error) { alert('❌ Erreur : ' + error.message); return; }
+            await loadCongesData();
+        }
+
+        function toggleOffertMode() {
+            const isOffert = document.getElementById('conges-offert').checked;
+            const nbField = document.getElementById('conges-nb-jours');
+            nbField.disabled = isOffert; nbField.required = !isOffert;
+            if (isOffert) nbField.value = '';
+        }
+
+        async function editCongesGroupComment(idsStr) {
+            const ids = idsStr.split(',').map(Number);
+            const first = congesEntrees.find(e => e.id === ids[0]);
+            const current = first ? (first.commentaire || '') : '';
+            const newComment = window.prompt('Commentaire pour cette période :', current);
+            if (newComment === null) return;
+            const { error } = await supabaseClient.from('conges_entrees').update({ commentaire: newComment.trim() || null }).in('id', ids);
+            if (error) { alert('❌ Erreur : ' + error.message); return; }
+            const savedYear = calendarYear, savedMonth = calendarMonth;
+            await loadCongesData();
+            calendarYear = savedYear; calendarMonth = savedMonth;
+            renderCalendar();
+        }
+
+        async function deleteCongesGroupStr(idsStr) {
+            const ids = idsStr.split(',').map(Number);
+            const label = ids.length > 1 ? `cette période (${ids.length} jours)` : 'cette entrée';
+            if (!confirm(`Supprimer ${label} ?`)) return;
+            const { error } = await supabaseClient.from('conges_entrees').delete().in('id', ids);
+            if (error) { alert('❌ Erreur : ' + error.message); return; }
+            const savedYear = calendarYear, savedMonth = calendarMonth;
+            await loadCongesData();
+            calendarYear = savedYear; calendarMonth = savedMonth;
+            renderCalendar();
         }
     </script>
 
