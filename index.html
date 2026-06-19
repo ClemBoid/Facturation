@@ -113,9 +113,58 @@
             .mini-dash { display: flex !important; }
         }
         .print-title { display: none; }
+
+        /* TOAST NOTIFICATIONS */
+        #toast-container { position: fixed; bottom: 22px; right: 18px; z-index: 99998; display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: none; max-width: 360px; }
+        .toast { background: var(--card-bg); border-radius: 8px; padding: 11px 16px; box-shadow: 0 4px 18px rgba(0,0,0,0.18); display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; pointer-events: all; opacity: 0; transform: translateX(60px); transition: opacity 0.22s, transform 0.22s; border-left: 4px solid #ccc; color: var(--text); }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast-success { border-left-color: var(--success); }
+        .toast-error { border-left-color: var(--danger); }
+        .toast-info { border-left-color: var(--accent); }
+        .toast-warning { border-left-color: var(--orange); }
+
+        /* NAV BADGE */
+        .nav-btn-wrap { position: relative; flex-grow: 1; display: flex; }
+        .nav-btn-wrap > button { flex: 1; }
+        .nav-badge { position: absolute; top: -6px; right: -6px; background: var(--danger); color: white; border-radius: 10px; min-width: 18px; height: 18px; font-size: 10px; font-weight: bold; display: none; align-items: center; justify-content: center; padding: 0 4px; pointer-events: none; z-index: 2; }
+
+        /* HOME MONTH SUMMARY */
+        .month-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 8px; }
+        .month-card { background: var(--card-bg); padding: 11px 14px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); border-left: 3px solid var(--border); }
+        .month-card h3 { margin: 0 0 3px; color: #7f8c8d; font-size: 11px; font-weight: bold; }
+        .month-card .amount { font-size: 16px; font-weight: bold; color: var(--primary); }
+
+        /* COMPACT MODE */
+        body.compact-mode table td, body.compact-mode table th { padding: 4px 6px !important; }
+        body.compact-mode .mini-card { padding: 10px; }
+
+        /* CONGES SOLDE COUNTER (near calendar) */
+        #conges-solde-counter { display: none; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; margin-bottom: 12px; flex-wrap: wrap; gap: 20px; align-items: center; }
+
+        /* CHARGES TEMPLATES */
+        #charges-templates-bar { background: #fef9ee; border: 1px solid #f5b041; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; display: none; }
+
+        /* MOBILE RESPONSIVE */
+        @media (max-width: 640px) {
+            body { padding: 8px; padding-bottom: 80px; }
+            .nav-buttons { position: fixed; bottom: 0; left: 0; right: 0; z-index: 999; background: var(--primary); padding: 6px 8px; border-radius: 0; justify-content: space-around; }
+            .nav-buttons button, .nav-btn-wrap > button { font-size: 11px; padding: 6px 7px; flex-grow: 0; flex-basis: calc(25% - 8px); }
+            .nav-btn-wrap { flex-grow: 0; flex-basis: calc(25% - 8px); }
+            .dashboard { grid-template-columns: repeat(2, 1fr); }
+            .month-summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .form-grid { grid-template-columns: 1fr; }
+            .charts-wrapper { flex-direction: column; }
+            .chart-card { min-width: unset; }
+            .filters { flex-wrap: wrap; }
+            .section { padding: 12px; overflow-x: auto; }
+            .header { padding: 10px; }
+            .header h1 { font-size: 16px; }
+            #search-bar-wrapper { margin-bottom: 8px; }
+        }
     </style>
 </head>
 <body>
+    <div id="toast-container"></div>
 
     <!-- ÉCRAN DE CONNEXION -->
     <div id="auth-overlay">
@@ -134,10 +183,13 @@
         <div style="display: flex; align-items: center; gap: 15px;">
             <h1 style="margin:0; font-size: 20px;">⚖️ Gestion du Cabinet (Cloud)</h1>
             <button onclick="toggleDarkMode()" style="background:none; border:none; cursor:pointer; font-size: 22px; padding:0;" title="Basculer le mode sombre">🌗</button>
-            <span id="sync-indicator" style="font-size: 11px; color: rgba(255,255,255,0.55);"></span>
+            <label title="Mode compact : tableaux plus denses" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.7);user-select:none;">
+                <input type="checkbox" id="compact-mode-toggle" onchange="toggleCompactMode()" style="cursor:pointer;"> Compact
+            </label>
+            <span id="sync-indicator" style="font-size: 11px; color: rgba(255,255,255,0.55); display:flex; align-items:center; gap:4px;"></span>
         </div>
         <div class="nav-buttons">
-            <button onclick="showSection(&#39;factures&#39;)">Factures</button>
+            <div class="nav-btn-wrap"><button onclick="showSection('factures')">Factures</button><span class="nav-badge" id="factures-badge"></span></div>
             <button onclick="showSection(&#39;frais&#39;)">Notes de Frais</button>
             <button onclick="showSection(&#39;charges&#39;)">Charges</button>
             <button onclick="showSection(&#39;dossiers&#39;)" style="background-color: #8e44ad;">📂 Dossiers</button>
@@ -145,6 +197,20 @@
             <button onclick="showSection(&#39;conges&#39;)" style="background-color:#16a085;">🏖️ Congés</button>
             <button onclick="showSection(&#39;sauvegarde&#39;)">Sauvegarde</button>
             <button onclick="logout()" style="background-color: transparent; border: 1px solid white; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 13px;">Déconnexion</button>
+        </div>
+    </div>
+
+    <div id="search-bar-wrapper" style="position:relative; margin-bottom:12px;">
+        <div style="position:relative;">
+            <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:15px; color:#aaa; pointer-events:none;">🔍</span>
+            <input type="search" id="global-search" autocomplete="off" placeholder="Rechercher dans toutes les sections…"
+                   oninput="runGlobalSearch()" onkeydown="handleSearchKey(event)"
+                   style="width:100%; box-sizing:border-box; padding:10px 40px 10px 38px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:var(--card-bg); color:var(--text); outline:none;">
+            <button id="search-clear-btn" onclick="clearSearch()" title="Effacer"
+                    style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:15px; color:#aaa; padding:0; line-height:1;">✕</button>
+        </div>
+        <div id="search-results"
+             style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.13); z-index:9999; max-height:420px; overflow-y:auto;">
         </div>
     </div>
 
@@ -173,6 +239,28 @@
                 <div class="amount" id="total-debours" style="color: #7f8c8d; font-size: 16px;">0,00 €</div>
             </div>
         </div>
+
+        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">
+            <div style="font-size:11px;font-weight:bold;color:#7f8c8d;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Mois en cours — <span id="mois-label"></span></div>
+            <div class="month-summary-grid">
+                <div class="month-card" style="border-left-color:var(--accent);"><h3>CA Facturé (mois)</h3><div class="amount" id="ca-mois-facture" style="color:var(--accent);">—</div></div>
+                <div class="month-card" style="border-left-color:var(--success);"><h3>CA Encaissé (mois)</h3><div class="amount" id="ca-mois-encaisse" style="color:var(--success);">—</div></div>
+                <div class="month-card" style="border-left-color:var(--danger);"><h3>Impayées (total)</h3><div class="amount" id="nb-impayes-total" style="color:var(--danger);">—</div></div>
+                <div class="month-card" style="border-left-color:var(--purple);"><h3>Frais du mois</h3><div class="amount" id="frais-du-mois" style="color:var(--purple);">—</div></div>
+                <div class="month-card" style="border-left-color:var(--orange);"><h3>Taux recouvrement</h3><div class="amount" id="taux-recouvrement" style="color:var(--orange);">—</div></div>
+                <div class="month-card" style="border-left-color:#8e44ad;"><h3>CA moyen / mois <span id="ca-moyen-label" style="font-size:10px;color:#aaa;font-weight:normal;"></span></h3><div class="amount" id="ca-mensuel-moyen" style="color:#8e44ad;">—</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="monthly-chart-card" style="background:var(--card-bg);padding:18px 20px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);margin-bottom:20px;display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;color:#7f8c8d;font-size:14px;">Évolution mensuelle du CA encaissé (HT)</h3>
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text);">
+                <input type="checkbox" id="monthly-chart-24m" onchange="updateMonthlyChart()"> Afficher 24 mois
+            </label>
+        </div>
+        <div style="position:relative;height:200px;"><canvas id="caMonthlyChart"></canvas></div>
     </div>
 
     <div id="dossiers" class="section">
@@ -334,6 +422,16 @@
                 <div class="amount" id="analyse-poids-frais" style="color: var(--purple)">0.0 %</div>
                 <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">Volume d'avances / CA (Opération neutre)</div>
             </div>
+            <div class="card" style="border-bottom: 4px solid var(--accent);">
+                <h3>Taux de recouvrement</h3>
+                <div class="amount" id="analyse-taux-rec" style="color: var(--accent)">— %</div>
+                <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">% factures payées sur la période</div>
+            </div>
+            <div class="card" style="border-bottom: 4px solid #16a085;">
+                <h3>Projection CA annuelle</h3>
+                <div class="amount" id="analyse-projection" style="color: #16a085; font-size:16px;">—</div>
+                <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">Extrapolée depuis le rythme actuel</div>
+            </div>
         </div>
 
         <div class="charts-wrapper">
@@ -430,7 +528,7 @@
                         <th onclick="sortTableFac(&#39;debours&#39;)">Débours <span class="sort-icon" id="sort-fac-debours"></span></th>
                         <th onclick="sortTableFac(&#39;total&#39;)">Total TTC <span class="sort-icon" id="sort-fac-total"></span></th>
                         <th onclick="sortTableFac(&#39;payee&#39;)">Statut <span class="sort-icon" id="sort-fac-payee"></span></th>
-                        <th onclick="sortTableFac('date_paiement')">Date Paiement <span class="sort-icon" id="sort-fac-date_paiement"></span></th>
+                        <th onclick="sortTableFac('date_paiement')" style="white-space:nowrap;">Date Paiement <span class="sort-icon" id="sort-fac-date_paiement"></span></th>
                         <th class="action-col">Action</th>
                     </tr>
                 </thead>
@@ -548,6 +646,7 @@
 
     <div id="charges" class="section">
         <h2 id="form-title-charges">Ajouter une Charge / Cotisation</h2>
+        <div id="charges-templates-bar"></div>
         <form onsubmit="saveCharge(event)">
             <div class="form-grid">
                 <div class="form-group"><label>Date</label><input type="date" id="charge-date" required=""></div>
@@ -575,8 +674,9 @@
                 </div>
                 <div class="form-group"><label>Montant (€)</label><input type="number" step="0.01" id="charge-montant" required=""></div>
             </div>
-            <div style="text-align: right; margin-top: 10px;">
-                <button type="button" id="cancel-btn-charges" class="btn btn-warning" style="display:none; padding: 10px 15px; margin-right: 10px;" onclick="cancelEditCharge()">Annuler</button>
+            <div style="text-align: right; margin-top: 10px; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-warning" onclick="saveChargesTemplate()" title="Enregistrer comme modèle réutilisable" style="background:#f39c12;">⭐ Enregistrer modèle</button>
+                <button type="button" id="cancel-btn-charges" class="btn btn-warning" style="display:none;" onclick="cancelEditCharge()">Annuler</button>
                 <button type="submit" id="submit-btn-charges" class="btn btn-success">Ajouter la charge</button>
             </div>
         </form>
@@ -689,7 +789,10 @@
     </div>
 
     <div id="conges" class="section">
-        <h2>🏖️ Congés</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2 style="margin:0;">🏖️ Congés</h2>
+            <button class="btn btn-excel" onclick="exportExcelConges()" title="Exporter le tableau de congés au format Excel">📗 Export congés</button>
+        </div>
 
         <div id="conges-annees-tabs" style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; align-items:center;"></div>
 
@@ -709,8 +812,13 @@
             <div id="conges-config-card" style="background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:15px;"></div>
             <div class="dashboard" id="conges-dashboard" style="margin-bottom:20px;"></div>
 
+            <!-- VUE ANNUELLE MINIATURE -->
+            <div id="conges-annual-view" style="margin-bottom:15px;"></div>
+
             <!-- CALENDRIER -->
-            <h3 style="margin-bottom:10px;">Calendrier</h3>
+            <h3 style="margin-bottom:6px;">Calendrier</h3>
+            <!-- COMPTEUR PERMANENT SOLDE -->
+            <div id="conges-solde-counter"></div>
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap;">
                 <button class="btn btn-info" onclick="changeCalendarMonth(-1)" style="padding:6px 12px;">◀</button>
                 <strong id="calendar-month-label" style="min-width:160px; text-align:center; font-size:15px;"></strong>
@@ -781,7 +889,8 @@
             <h3 style="color:var(--text);">1. Sauvegarde système (Fichier de restauration .json)</h3>
             <p style="color:var(--text);">Exportez vos données brutes pour ne rien perdre ou changer d'ordinateur.</p>
             <button class="btn btn-success" onclick="exportJSON()">Créer une sauvegarde (.json)</button>
-            <br><br>
+            <div id="export-history-section" style="margin-top:10px;"></div>
+            <br>
             <p style="color:var(--text);">Restaurer une sauvegarde précédente :</p>
             <input type="file" id="import-json-file" accept=".json" style="color:var(--text);">
             <button class="btn btn-warning" onclick="importJSON()">Restaurer les données</button>
@@ -894,7 +1003,7 @@
             if (error) { alert('❌ Erreur : ' + error.message); return; }
             document.getElementById('new-pwd-1').value = '';
             document.getElementById('new-pwd-2').value = '';
-            alert('Mot de passe modifié avec succès !');
+            showToast('Mot de passe modifié avec succès !', 'success');
         }
 
         function showApp() {
@@ -938,7 +1047,7 @@
             if (frRes.data) frais = frRes.data;
             if (cRes.data) charges = cRes.data;
             const syncEl = document.getElementById('sync-indicator');
-            if (syncEl) syncEl.innerText = '● sync ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+            if (syncEl) syncEl.innerHTML = `<span style="color:#2ecc71;font-size:10px;">●</span> sync ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` ;
 
             document.getElementById('fac-date').valueAsDate = new Date();
             document.getElementById('frais-date').valueAsDate = new Date();
@@ -958,6 +1067,9 @@
             updateDossiersList();
             renderFactures(); renderFrais(); renderCharges();
             updateDashboard(); checkAlerts();
+            loadCompactMode();
+            renderExportHistory();
+            renderChargesTemplates();
         }
 
         window.onclick = function(event) {
@@ -1019,6 +1131,24 @@
                         </div>
                     </div>`;
             }
+
+            // Factures impayées depuis longtemps
+            const overdue30 = factures.filter(f => f.payee === 'NON' && f.date && (today - new Date(f.date + 'T00:00:00')) / 86400000 >= 30);
+            if (overdue30.length > 0) {
+                const overdue60 = overdue30.filter(f => (today - new Date(f.date + 'T00:00:00')) / 86400000 >= 60).length;
+                const overdue90 = overdue30.filter(f => (today - new Date(f.date + 'T00:00:00')) / 86400000 >= 90).length;
+                let msg = `⏰ ${overdue30.length} facture(s) impayée(s) depuis plus de 30 jours`;
+                if (overdue60) msg += ` dont ${overdue60} > 60j`;
+                if (overdue90) msg += ` et ${overdue90} > 90j`;
+                container.innerHTML += `
+                    <div class="alert-banner alert-warning" id="alert-impayees">
+                        <span>${msg}</span>
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="showSection('factures'); document.getElementById('search-status-fac').value='NON'; renderFactures(); closeAlert('alert-impayees');">Voir</button>
+                            <button onclick="closeAlert('alert-impayees')" style="border:none; background:transparent; font-size:16px;">✖</button>
+                        </div>
+                    </div>`;
+            }
         }
 
         function formatMoney(amount) { return amount.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
@@ -1055,6 +1185,8 @@
             document.getElementById(id).classList.add('active');
             const dashboard = document.getElementById('home-dashboard');
             dashboard.style.display = (id === 'factures') ? 'block' : 'none';
+            const chartCard = document.getElementById('monthly-chart-card');
+            if (chartCard) chartCard.style.display = (id === 'factures' && factures.length > 0) ? 'block' : 'none';
             if(id === 'factures') updateDashboard();
             if(id === 'analyse') updateAnalyse();
             if(id === 'dossiers') { updateDossiersList(); renderBilanDossier(); }
@@ -1341,11 +1473,12 @@
                 const bg = f.payee === 'OUI' ? '#d4edda' : '#f8d7da', col = f.payee === 'OUI' ? '#155724' : '#721c24';
                 const dBg = f.date_paiement ? 'transparent' : 'rgba(0,0,0,0.05)', dCol = f.date_paiement ? 'inherit' : '#6c757d';
                 const tvaLabel = f.tva_montant > 0 ? `<span style="color:var(--accent)">${formatMoney(f.tva_montant)} €</span>` : '<span style="color:#aaa">—</span>';
-                tbody.innerHTML += `<tr>
+                const rowBg = f.payee === 'OUI' ? 'rgba(39,174,96,0.06)' : 'rgba(231,76,60,0.06)';
+                tbody.innerHTML += `<tr style="background:${rowBg};">
                     <td><b>${f.num}</b></td><td>${formatDateFR(f.date)}</td><td>${f.dossier}</td>
                     <td>${formatMoney(f.ht)} €</td><td>${tvaLabel}</td><td>${formatMoney(f.debours)} €</td><td><b>${formatMoney(f.total)} €</b></td>
                     <td><select class="status-select" onchange="updateStatus(${f.id}, this.value)" style="background: ${bg}; color: ${col}; border: 1px solid ${col};"><option value="OUI" ${f.payee === 'OUI' ? 'selected' : ''}>Payée ✅</option><option value="NON" ${f.payee === 'NON' ? 'selected' : ''}>Impayée ❌</option></select></td>
-                    <td><input type="date" value="${f.date_paiement || ''}" onchange="updateDate(${f.id}, this.value)" style="background: ${dBg}; color: ${dCol}; border: 1px solid var(--border); border-radius: 4px; padding: 5px; width: 110px;"></td>
+                    <td><input type="date" value="${f.date_paiement || ''}" onchange="updateDate(${f.id}, this.value)" style="background: ${dBg}; color: ${dCol}; border: 1px solid var(--border); border-radius: 4px; padding: 5px; width: 138px;"></td>
                     <td class="action-col action-cell">
                         <button class="btn btn-copy" onclick="duplicateFacture(${f.id})" title="Dupliquer">📋</button>
                         <button class="btn btn-info" onclick="editFacture(${f.id})" title="Modifier">✏️</button>
@@ -1610,6 +1743,36 @@
             document.getElementById('ca-ht').innerText = formatMoney(totCAHT) + ' €'; document.getElementById('ca-attente').innerText = formatMoney(totAtt) + ' €';
             document.getElementById('total-charges').innerText = formatMoney(totC) + ' €'; document.getElementById('solde-net').innerText = formatMoney(totCAHT - totC) + ' €';
             document.getElementById('total-debours').innerText = formatMoney(totDeb) + ' €';
+
+            // Statistiques du mois en cours
+            const now = new Date();
+            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            const moisFR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+            const moisLabel = document.getElementById('mois-label');
+            if (moisLabel) moisLabel.innerText = moisFR[now.getMonth()] + ' ' + now.getFullYear();
+            const facMois = factures.filter(f => f.date && f.date.startsWith(currentMonth));
+            const caFactureMois = facMois.reduce((a, f) => a + f.ht, 0);
+            const caEncaisseMois = facMois.filter(f => f.payee === 'OUI').reduce((a, f) => a + f.ht, 0);
+            const nbImpayes = factures.filter(f => f.payee === 'NON').length;
+            const fraisMoisTotal = frais.filter(f => f.date && f.date.startsWith(currentMonth)).reduce((a, f) => a + f.montant, 0);
+            const totalCAAll = factures.reduce((a, f) => a + f.ht, 0);
+            const totalPayeCAAll = factures.filter(f => f.payee === 'OUI').reduce((a, f) => a + f.ht, 0);
+            const tauxRec = totalCAAll > 0 ? Math.round(totalPayeCAAll / totalCAAll * 100) : 0;
+            const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+            setEl('ca-mois-facture', formatMoney(caFactureMois) + ' €');
+            setEl('ca-mois-encaisse', formatMoney(caEncaisseMois) + ' €');
+            setEl('nb-impayes-total', nbImpayes + (nbImpayes > 1 ? ' factures' : nbImpayes === 1 ? ' facture' : ' —'));
+            setEl('frais-du-mois', formatMoney(fraisMoisTotal) + ' €');
+            setEl('taux-recouvrement', tauxRec + ' %');
+            const thisYear = now.getFullYear();
+            const elapsedMonths = now.getMonth(); // 0=Jan → Jan non écoulé ; en juin = 5 mois écoulés (jan–mai)
+            const caAnnuelOK = factures.filter(f => f.date && f.date.startsWith(String(thisYear)) && f.payee === 'OUI').reduce((a, f) => a + f.ht, 0);
+            const caMoyen = elapsedMonths > 0 ? Math.round(caAnnuelOK / elapsedMonths) : 0;
+            setEl('ca-mensuel-moyen', elapsedMonths > 0 ? formatMoney(caMoyen) + ' €' : '—');
+            const labelEl = document.getElementById('ca-moyen-label');
+            if (labelEl) labelEl.innerText = elapsedMonths > 0 ? `(${elapsedMonths} mois)` : '';
+            updateNavBadge();
+            updateMonthlyChart();
         }
 
         // ==========================
@@ -1632,6 +1795,25 @@
             document.getElementById('analyse-poids-charges').innerText = ratioCharges.toFixed(1) + ' %';
             document.getElementById('analyse-poids-frais').innerText = ratioFrais.toFixed(1) + ' %';
             drawCharts(totCAHT, totF, totC, soldeNet, chargesDefinitivesY);
+
+            // Taux de recouvrement (nb factures payées / total)
+            const nbFac = facY.length, nbPaye = facY.filter(f => f.payee === 'OUI').length;
+            const txRec = nbFac > 0 ? (nbPaye / nbFac * 100).toFixed(1) + ' %' : '— %';
+            const elTx = document.getElementById('analyse-taux-rec');
+            if (elTx) elTx.innerText = txRec;
+
+            // Projection annuelle (uniquement si l'année sélectionnée est l'année courante)
+            const elProj = document.getElementById('analyse-projection');
+            if (elProj) {
+                const currentYearStr = new Date().getFullYear().toString();
+                if (sYear === currentYearStr) {
+                    const mElapsed = new Date().getMonth() + 1;
+                    const caYearSoFar = factures.filter(f => f.date && f.date.startsWith(currentYearStr) && f.payee === 'OUI').reduce((a, f) => a + f.ht, 0);
+                    elProj.innerText = formatMoney(Math.round(caYearSoFar / mElapsed * 12)) + ' €';
+                } else {
+                    elProj.innerText = sYear === 'ALL' ? '— (choisir une année)' : '— (année passée)';
+                }
+            }
         }
 
         function drawCharts(ca, frais, chargesMontant, solde, chargesArray) {
@@ -1689,24 +1871,33 @@
             const wsCharges = XLSX.utils.json_to_sheet(dataCharges.length ? dataCharges : [{ "Message": "Aucune charge" }]);
             XLSX.utils.book_append_sheet(wb, wsCharges, "Charges");
 
+            // 4. Feuille Congés
+            const yearsConges = [...congesConfig].sort((a,b) => a.annee - b.annee);
+            if (yearsConges.length) XLSX.utils.book_append_sheet(wb, buildCongesWs(yearsConges), "Congés");
+
+            // 5. Feuille Récapitulatif
+            XLSX.utils.book_append_sheet(wb, buildRecapWs(), "Récapitulatif");
+
             XLSX.writeFile(wb, `Export_Complet_Cabinet_${new Date().toISOString().split('T')[0]}.xlsx`);
+            trackExport('Export Excel complet'); showToast('Export Excel généré.', 'success');
         }
 
         async function exportJSON() {
-            const data = JSON.stringify({factures, frais, charges}, null, 2);
+            const data = JSON.stringify({factures, frais, charges, congesConfig, congesEntrees}, null, 2);
             const fileName = 'sauvegarde_cabinet_' + new Date().toISOString().split('T')[0] + '.json';
             try {
                 if (window.showSaveFilePicker) {
                     const handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'Fichier JSON', accept: {'application/json': ['.json']} }] });
-                    const w = await handle.createWritable(); await w.write(data); await w.close(); 
+                    const w = await handle.createWritable(); await w.write(data); await w.close();
                     localStorage.setItem('lastBackupDate', Date.now().toString()); checkAlerts();
-                    alert("Sauvegarde enregistrée avec succès !");
+                    trackExport('Sauvegarde JSON'); showToast('Sauvegarde créée avec succès !', 'success');
                 } else {
                     const blob = new Blob([data], {type:'application/json'}); const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = fileName; a.click(); 
+                    const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
                     localStorage.setItem('lastBackupDate', Date.now().toString()); checkAlerts();
+                    trackExport('Sauvegarde JSON'); showToast('Sauvegarde téléchargée.', 'success');
                 }
-            } catch (err) { if (err.name !== 'AbortError') alert("Erreur de sauvegarde."); }
+            } catch (err) { if (err.name !== 'AbortError') showToast('Erreur lors de la sauvegarde.', 'error'); }
         }
 
         async function importJSON() {
@@ -1722,6 +1913,8 @@
                 await supabaseClient.from('factures').delete().not('id', 'is', null);
                 await supabaseClient.from('frais').delete().not('id', 'is', null);
                 await supabaseClient.from('charges').delete().not('id', 'is', null);
+                await supabaseClient.from('conges_entrees').delete().not('id', 'is', null);
+                await supabaseClient.from('conges_config').delete().not('id', 'is', null);
                 if (d.factures && d.factures.length > 0) {
                     const cleanF = d.factures.map(f => ({
                         num: f.num, date: f.date, dossier: f.dossier, ht: f.ht, debours: f.debours, total: f.total,
@@ -1740,9 +1933,19 @@
                     const { error } = await supabaseClient.from('charges').insert(cleanC);
                     if (error) errors.push('Charges : ' + error.message);
                 }
+                if (d.congesConfig && d.congesConfig.length > 0) {
+                    const cleanCC = d.congesConfig.map(c => ({ annee: c.annee, debut_periode: c.debut_periode || null, fin_periode: c.fin_periode || null, jours_attribues: c.jours_attribues }));
+                    const { error } = await supabaseClient.from('conges_config').insert(cleanCC);
+                    if (error) errors.push('Congés config : ' + error.message);
+                }
+                if (d.congesEntrees && d.congesEntrees.length > 0) {
+                    const cleanCE = d.congesEntrees.map(e => ({ annee: e.annee, periode: e.periode, nb_jours: e.nb_jours, date_calendrier: e.date_calendrier || null, type_conge: e.type_conge || null, commentaire: e.commentaire || null }));
+                    const { error } = await supabaseClient.from('conges_entrees').insert(cleanCE);
+                    if (error) errors.push('Congés entrées : ' + error.message);
+                }
                 document.getElementById('import-json-file').value = '';
                 if (errors.length > 0) { alert('❌ Erreurs lors de l\'importation :\n' + errors.join('\n')); return; }
-                alert("Importation terminée !"); await saveData();
+                await saveData(); showToast('Importation terminée avec succès !', 'success');
             };
             reader.readAsText(f);
         }
@@ -1764,8 +1967,7 @@
                     const { error } = await supabaseClient.from('factures').insert(toInsert);
                     document.getElementById('import-csv-file').value = '';
                     if (error) { alert('❌ Erreur Supabase : ' + error.message); return; }
-                    alert(`${toInsert.length} facture(s) importée(s) avec succès !`);
-                    await saveData();
+                    await saveData(); showToast(`${toInsert.length} facture(s) importée(s) avec succès !`, 'success');
                 } else { alert("Aucune ligne valide trouvée dans le fichier CSV."); }
             };
             reader.readAsText(f);
@@ -1826,27 +2028,38 @@
             const report = getReportVers(currentAnneeConges);
             const total_dispo = parseFloat(cfg.jours_attribues) + report;
             const entrees = congesEntrees.filter(e => e.annee === currentAnneeConges);
-            const total_pose = entrees.reduce((a, e) => a + parseFloat(e.nb_jours), 0);
+            const isWEDate = ds => { if (!ds) return false; const d = new Date(ds + 'T00:00:00'); return d.getDay() === 0 || d.getDay() === 6; };
+            const total_pose = entrees.filter(e => !isWEDate(e.date_calendrier)).reduce((a, e) => a + parseFloat(e.nb_jours), 0);
             const reste = total_dispo - total_pose;
+            const restColor = reste <= 0 ? 'var(--danger)' : reste < 7 ? 'var(--orange)' : 'var(--success)';
             const fmt = d => d ? new Date(d).toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'}) : '—';
 
             document.getElementById('conges-config-card').innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
                     <div>
-                        <h3 style="margin:0 0 8px 0; color:var(--primary);">Congés ${cfg.annee}</h3>
-                        <p style="margin:3px 0; font-size:13px;">Période : <b>${fmt(cfg.debut_periode)}</b> → <b>${fmt(cfg.fin_periode)}</b></p>
-                        <div style="display:flex; gap:20px; flex-wrap:wrap; margin:8px 0 4px 0;">
+                        <h3 style="margin:0 0 6px 0; color:var(--primary);">Congés ${cfg.annee}</h3>
+                        <p style="margin:0 0 8px 0; font-size:13px;">Période : <b>${fmt(cfg.debut_periode)}</b> → <b>${fmt(cfg.fin_periode)}</b></p>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch;">
                             <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 14px; text-align:center;">
-                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Jours année ${cfg.annee}</div>
+                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Attribués ${cfg.annee}</div>
                                 <div style="font-size:20px; font-weight:bold; color:var(--primary);">${cfg.jours_attribues} j</div>
                             </div>
-                            <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 14px; text-align:center; opacity:${report > 0 ? '1' : '0.45'};">
-                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Report de ${cfg.annee-1}</div>
+                            <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 14px; text-align:center; opacity:${report > 0 ? '1' : '0.35'};">
+                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Report ${cfg.annee-1}</div>
                                 <div style="font-size:20px; font-weight:bold; color:var(--accent);">+${report} j</div>
                             </div>
                             <div style="background:var(--primary); border-radius:6px; padding:8px 14px; text-align:center;">
-                                <div style="font-size:11px; color:rgba(255,255,255,0.75); margin-bottom:3px;">Total à poser</div>
+                                <div style="font-size:11px; color:rgba(255,255,255,0.7); margin-bottom:3px;">Total à poser</div>
                                 <div style="font-size:20px; font-weight:bold; color:white;">${total_dispo} j</div>
+                            </div>
+                            <div style="width:1px; background:var(--border); margin:0 4px; align-self:stretch;"></div>
+                            <div style="background:rgba(231,76,60,0.08); border:1px solid var(--danger); border-radius:6px; padding:8px 14px; text-align:center;">
+                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Posés</div>
+                                <div style="font-size:20px; font-weight:bold; color:var(--danger);">${total_pose} j</div>
+                            </div>
+                            <div style="background:rgba(39,174,96,0.08); border:2px solid ${restColor}; border-radius:6px; padding:8px 14px; text-align:center;">
+                                <div style="font-size:11px; color:#888; margin-bottom:3px;">Restants</div>
+                                <div style="font-size:22px; font-weight:bold; color:${restColor};">${reste} j</div>
                             </div>
                         </div>
                     </div>
@@ -1862,11 +2075,8 @@
                     <button class="btn btn-warning" onclick="toggleEditConfig()">Annuler</button>
                 </div>`;
 
-            const restColor = reste <= 0 ? 'var(--danger)' : reste < 7 ? 'var(--orange)' : 'var(--success)';
-            document.getElementById('conges-dashboard').innerHTML = `
-                <div class="card" style="border-bottom:4px solid var(--danger);"><h3>Jours posés</h3><div class="amount" style="color:var(--danger);">${total_pose} j</div></div>
-                <div class="card" style="border-bottom:4px solid ${restColor};"><h3>Jours restants</h3><div class="amount" style="color:${restColor};">${reste} j</div></div>
-                <div class="card" style="border-bottom:4px solid var(--accent);"><h3>Total disponible</h3><div class="amount" style="color:var(--accent);">${total_dispo} j</div></div>`;
+            const dashEl = document.getElementById('conges-dashboard');
+            if (dashEl) { dashEl.innerHTML = ''; dashEl.style.display = 'none'; }
 
             const tbody = document.getElementById('conges-body'); tbody.innerHTML = '';
             const calEntries = entrees.filter(e => e.date_calendrier);
@@ -1925,6 +2135,9 @@
             tfoot.style.display = entrees.length ? 'table-row-group' : 'none';
             document.getElementById('conges-total-pose').innerText = total_pose + ' j';
             renderCalendar();
+            renderCongesAnnualView();
+            const sc = document.getElementById('conges-solde-counter');
+            if (sc) sc.style.display = 'none';
         }
 
         function getEaster(year) {
@@ -2031,9 +2244,22 @@
 
         function changeCalendarMonth(delta) {
             if (calendarYear === null) { renderCalendar(); return; }
+            const prevYear = calendarYear, prevMonth = calendarMonth;
             calendarMonth += delta;
             if (calendarMonth < 0)  { calendarMonth = 11; calendarYear--; }
             if (calendarMonth > 11) { calendarMonth = 0;  calendarYear++; }
+            const cfg = congesConfig.find(c => c.annee === currentAnneeConges);
+            if (cfg && cfg.debut_periode && cfg.fin_periode) {
+                const debut = new Date(cfg.debut_periode + 'T00:00:00');
+                const fin   = new Date(cfg.fin_periode   + 'T00:00:00');
+                const firstOfMonth = new Date(calendarYear, calendarMonth, 1);
+                const lastOfMonth  = new Date(calendarYear, calendarMonth + 1, 0);
+                if (lastOfMonth < debut || firstOfMonth > fin) {
+                    calendarYear = prevYear; calendarMonth = prevMonth;
+                    showToast('Navigation limitée à la période de congés active.', 'warning');
+                    return;
+                }
+            }
             renderCalendar();
         }
 
@@ -2172,6 +2398,135 @@
             renderCalendar();
         }
 
+        function buildCongesYearRows(annee) {
+            const ye = congesEntrees.filter(e => e.annee === annee);
+            const cal = ye.filter(e => e.date_calendrier);
+            const offertCal = cal.filter(e => e.type_conge === 'offert').sort((a,b) => a.date_calendrier.localeCompare(b.date_calendrier));
+            const manual = ye.filter(e => !e.date_calendrier);
+            const rows = [];
+            groupCalendarEntries(cal).forEach(group => {
+                const dates = group.map(e => e.date_calendrier).sort();
+                const totalJ = group.reduce((a,e) => a + parseFloat(e.nb_jours), 0);
+                let label = group.length === 1 ? formatDateFR(dates[0]) : `${formatDateFR(dates[0])} au ${formatDateFR(dates[dates.length-1])}`;
+                if (group.length === 1 && group[0].type_conge === 'matin') label += ' (matin)';
+                else if (group.length === 1 && group[0].type_conge === 'apres_midi') label += ' (après-midi)';
+                if (group[0].commentaire) label += ` - ${group[0].commentaire}`;
+                rows.push({ sd: dates[0], periode: label, nb: totalJ });
+            });
+            offertCal.forEach(e => {
+                let label = `${formatDateFR(e.date_calendrier)} ("offert")`;
+                if (e.commentaire) label += ` - ${e.commentaire}`;
+                rows.push({ sd: e.date_calendrier, periode: label, nb: 0 });
+            });
+            manual.forEach(e => {
+                rows.push({ sd: '9999', periode: e.periode + (e.commentaire ? ` - ${e.commentaire}` : ''), nb: parseFloat(e.nb_jours) });
+            });
+            rows.sort((a,b) => a.sd.localeCompare(b.sd));
+            return rows;
+        }
+
+        function buildCongesWs(years) {
+            const yearRows = years.map(cfg => buildCongesYearRows(cfg.annee));
+            const entryRows = Math.max(12, ...yearRows.map(r => r.length));
+            const RT = 0, RP = 1, RA = 3, RR = 4, RTC = 5, RH = 7;
+            const RES = 8, REE = RES + entryRows - 1;
+            const RTOT = REE + 1, RRF = RTOT + 2, RN = RTOT + 3;
+            const ws = {};
+            const ec = (r, c) => XLSX.utils.encode_cell({ r, c });
+            const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : '';
+            years.forEach((cfg, yi) => {
+                const cp = yi * 3, cn = cp + 1;
+                const isFirst = yi === 0, isLast = yi === years.length - 1;
+                ws[ec(RT, cp)] = { v: `Congés ${cfg.annee}`, t: 's' };
+                ws[ec(RP, cp)] = { v: `Du ${fmtDate(cfg.debut_periode)} au ${fmtDate(cfg.fin_periode)}`, t: 's' };
+                ws[ec(RA, cp)] = { v: 'Nombre de jours à poser', t: 's' };
+                ws[ec(RA, cn)] = { v: parseFloat(cfg.jours_attribues), t: 'n' };
+                if (!isFirst) {
+                    ws[ec(RR, cp)] = { v: `Report congés ${cfg.annee-1}`, t: 's' };
+                    ws[ec(RR, cn)] = { f: ec(RRF, (yi-1)*3+1), t: 'n' };
+                    ws[ec(RTC, cp)] = { v: `Total jours à poser en ${cfg.annee}`, t: 's' };
+                    ws[ec(RTC, cn)] = { f: `${ec(RA,cn)}+${ec(RR,cn)}`, t: 'n' };
+                }
+                ws[ec(RH, cp)] = { v: 'Période', t: 's' };
+                ws[ec(RH, cn)] = { v: 'Nb jours posés', t: 's' };
+                yearRows[yi].forEach((row, ri) => {
+                    ws[ec(RES+ri, cp)] = { v: row.periode, t: 's' };
+                    ws[ec(RES+ri, cn)] = { v: row.nb, t: 'n' };
+                });
+                ws[ec(RTOT, cp)] = { v: 'Total', t: 's' };
+                ws[ec(RTOT, cn)] = { f: `SUM(${ec(RES,cn)}:${ec(REE,cn)})`, t: 'n' };
+                ws[ec(RRF, cp)] = { v: isLast ? 'Reste à poser / reporter' : `Jours reportés sur ${cfg.annee+1}`, t: 's' };
+                ws[ec(RRF, cn)] = { f: `${isFirst ? ec(RA,cn) : ec(RTC,cn)}-${ec(RTOT,cn)}`, t: 'n' };
+                ws[ec(RN, cp)]  = { v: '(Après accord)', t: 's' };
+            });
+            const lastCol = (years.length-1)*3+1;
+            ws['!ref'] = XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:RN, c:lastCol} });
+            const cols = [];
+            years.forEach((_,yi) => { cols[yi*3] = {wch:38}; cols[yi*3+1] = {wch:14}; if (yi < years.length-1) cols[yi*3+2] = {wch:4}; });
+            ws['!cols'] = cols;
+            return ws;
+        }
+
+        function buildRecapWs() {
+            const now = new Date().toLocaleDateString('fr-FR');
+            const aoa = [[`RÉCAPITULATIF DU CABINET — ${now}`], []];
+            const byYear = (arr, dateKey) => arr.reduce((m, x) => { const y = x[dateKey] ? new Date(x[dateKey]).getFullYear() : '?'; (m[y] = m[y]||[]).push(x); return m; }, {});
+
+            // Facturation
+            aoa.push(['FACTURATION'], ['Année', 'Nb factures', 'CA HT (€)', 'TVA (€)', 'Total TTC (€)', 'Encaissé (€)', 'Impayé (€)']);
+            const facMap = byYear(factures, 'date');
+            let tNb=0,tHT=0,tTVA=0,tTTC=0,tPaye=0,tImpaye=0;
+            Object.keys(facMap).sort().forEach(y => {
+                const fs = facMap[y];
+                const nb=fs.length, ht=fs.reduce((a,f)=>a+parseFloat(f.ht||0),0), tva=fs.reduce((a,f)=>a+parseFloat(f.tva_montant||0),0);
+                const ttc=fs.reduce((a,f)=>a+parseFloat(f.total||0),0);
+                const paye=fs.filter(f=>f.payee==='OUI').reduce((a,f)=>a+parseFloat(f.total||0),0);
+                const impaye=fs.filter(f=>f.payee!=='OUI').reduce((a,f)=>a+parseFloat(f.total||0),0);
+                aoa.push([y,nb,ht,tva,ttc,paye,impaye]);
+                tNb+=nb;tHT+=ht;tTVA+=tva;tTTC+=ttc;tPaye+=paye;tImpaye+=impaye;
+            });
+            aoa.push(['TOTAL',tNb,tHT,tTVA,tTTC,tPaye,tImpaye],[]);
+
+            // Frais
+            aoa.push(['NOTES DE FRAIS'], ['Année', 'Montant (€)']);
+            const fraisMap = byYear(frais, 'date');
+            let tFrais=0;
+            Object.keys(fraisMap).sort().forEach(y => { const m=fraisMap[y].reduce((a,f)=>a+parseFloat(f.montant||0),0); aoa.push([y,m]); tFrais+=m; });
+            aoa.push(['TOTAL',tFrais],[]);
+
+            // Charges
+            aoa.push(['CHARGES'], ['Année', 'Montant (€)']);
+            const chargesMap = byYear(charges, 'date');
+            let tCharges=0;
+            Object.keys(chargesMap).sort().forEach(y => { const m=chargesMap[y].reduce((a,f)=>a+parseFloat(f.montant||0),0); aoa.push([y,m]); tCharges+=m; });
+            aoa.push(['TOTAL',tCharges],[]);
+
+            // Congés
+            if (congesConfig.length) {
+                aoa.push(['CONGÉS'], ['Année', 'Attribués (j)', 'Report (j)', 'Total dispo (j)', 'Posés (j)', 'Restants (j)']);
+                [...congesConfig].sort((a,b)=>a.annee-b.annee).forEach(cfg => {
+                    const report = getReportVers(cfg.annee);
+                    const total_dispo = parseFloat(cfg.jours_attribues) + report;
+                    const pose = congesEntrees.filter(e=>e.annee===cfg.annee).reduce((a,e)=>a+parseFloat(e.nb_jours),0);
+                    aoa.push([cfg.annee, parseFloat(cfg.jours_attribues), report, total_dispo, pose, total_dispo-pose]);
+                });
+            }
+
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = [{wch:30},{wch:14},{wch:14},{wch:16},{wch:16},{wch:16},{wch:16}];
+            return ws;
+        }
+
+        function exportExcelConges() {
+            if (typeof XLSX === 'undefined') { alert("Chargement en cours, réessayez dans quelques secondes."); return; }
+            const years = [...congesConfig].sort((a,b) => a.annee - b.annee);
+            if (!years.length) { alert("Aucune année de congés configurée."); return; }
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, buildCongesWs(years), "Congés");
+            XLSX.writeFile(wb, `Conges_${new Date().toISOString().split('T')[0]}.xlsx`);
+            trackExport('Export Excel congés'); showToast('Export congés généré.', 'success');
+        }
+
         async function deleteCongesGroupStr(idsStr) {
             const ids = idsStr.split(',').map(Number);
             const label = ids.length > 1 ? `cette période (${ids.length} jours)` : 'cette entrée';
@@ -2183,6 +2538,309 @@
             calendarYear = savedYear; calendarMonth = savedMonth;
             renderCalendar();
         }
+        // --- Recherche globale ---
+        function runGlobalSearch() {
+            const q = (document.getElementById('global-search').value || '').trim().toLowerCase();
+            const clearBtn = document.getElementById('search-clear-btn');
+            const resultsDiv = document.getElementById('search-results');
+            clearBtn.style.display = q ? 'block' : 'none';
+            if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
+
+            const match = v => v != null && String(v).toLowerCase().includes(q);
+
+            const sections = [
+                {
+                    label: '📄 Factures',
+                    items: factures.filter(f => match(f.num) || match(f.dossier) || match(formatDateFR(f.date)) || match(f.ht) || match(f.total)).slice(0, 7),
+                    render: f => ({ icon: f.payee === 'OUI' ? '✅' : '⏳', title: f.num || '—', sub: `${formatDateFR(f.date)} · ${f.dossier||'—'} · ${formatMoney(f.total)} €` }),
+                    go: () => showSection('factures')
+                },
+                {
+                    label: '🧾 Notes de Frais',
+                    items: frais.filter(f => match(f.type) || match(f.dossier) || match(formatDateFR(f.date)) || match(f.montant)).slice(0, 7),
+                    render: f => ({ icon: '🧾', title: f.type, sub: `${formatDateFR(f.date)} · ${formatMoney(f.montant)} €${f.dossier ? ' · '+f.dossier : ''}` }),
+                    go: () => showSection('frais')
+                },
+                {
+                    label: '📋 Charges',
+                    items: charges.filter(c => match(c.type) || match(c.notes) || match(formatDateFR(c.date)) || match(c.montant)).slice(0, 7),
+                    render: c => ({ icon: '📋', title: c.type, sub: `${formatDateFR(c.date)} · ${formatMoney(c.montant)} €${c.notes ? ' · '+c.notes : ''}` }),
+                    go: () => showSection('charges')
+                },
+                {
+                    label: '🏖️ Congés',
+                    items: congesEntrees.filter(e => match(e.periode) || match(e.commentaire) || match(e.date_calendrier)).slice(0, 7),
+                    render: e => ({ icon: '🏖️', title: e.periode || formatDateFR(e.date_calendrier) || '—', sub: `${e.annee} · ${parseFloat(e.nb_jours) === 0 ? 'Offerte' : e.nb_jours + ' j'}${e.commentaire ? ' · '+e.commentaire : ''}` }),
+                    go: item => { currentAnneeConges = item.annee; showSection('conges'); }
+                }
+            ];
+
+            resultsDiv.innerHTML = '';
+            let hasAny = false;
+
+            sections.forEach(section => {
+                if (!section.items.length) return;
+                hasAny = true;
+
+                const hdr = document.createElement('div');
+                hdr.style.cssText = 'padding:7px 14px 4px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.6px; background:var(--bg); border-bottom:1px solid var(--border);';
+                hdr.textContent = `${section.label} — ${section.items.length} résultat${section.items.length > 1 ? 's' : ''}`;
+                resultsDiv.appendChild(hdr);
+
+                section.items.forEach(item => {
+                    const { icon, title, sub } = section.render(item);
+                    const row = document.createElement('div');
+                    row.style.cssText = 'padding:9px 14px; cursor:pointer; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; transition:background 0.1s;';
+                    row.innerHTML = `<span style="font-size:17px;width:22px;text-align:center;flex-shrink:0;">${icon}</span><div style="min-width:0;"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div><div style="font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>`;
+                    row.addEventListener('mouseenter', () => row.style.background = 'var(--bg)');
+                    row.addEventListener('mouseleave', () => row.style.background = '');
+                    row.addEventListener('click', () => { section.go(item); clearSearch(); });
+                    resultsDiv.appendChild(row);
+                });
+            });
+
+            if (!hasAny) {
+                resultsDiv.innerHTML = `<div style="padding:18px;text-align:center;color:#aaa;font-size:13px;">Aucun résultat pour « ${q} »</div>`;
+            }
+            resultsDiv.style.display = 'block';
+        }
+
+        function clearSearch() {
+            document.getElementById('global-search').value = '';
+            document.getElementById('search-clear-btn').style.display = 'none';
+            document.getElementById('search-results').style.display = 'none';
+        }
+
+        function handleSearchKey(e) {
+            if (e.key === 'Escape') clearSearch();
+        }
+
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('search-bar-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('search-results').style.display = 'none';
+            }
+        });
+
+        // ========================
+        // TOAST NOTIFICATIONS
+        // ========================
+        function showToast(msg, type = 'success') {
+            const c = document.getElementById('toast-container');
+            if (!c) return;
+            const t = document.createElement('div');
+            t.className = `toast toast-${type}`;
+            const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+            t.innerHTML = `<span style="flex-shrink:0;font-size:15px;">${icons[type] || 'ℹ️'}</span><span>${msg}</span>`;
+            c.appendChild(t);
+            requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => { if (c.contains(t)) c.removeChild(t); }, 280); }, 3800);
+        }
+
+        // ========================
+        // BADGE NAV FACTURES
+        // ========================
+        function updateNavBadge() {
+            const nb = factures.filter(f => f.payee === 'NON').length;
+            const badge = document.getElementById('factures-badge');
+            if (!badge) return;
+            badge.textContent = nb > 99 ? '99+' : (nb || '');
+            badge.style.display = nb > 0 ? 'flex' : 'none';
+        }
+
+        // ========================
+        // COMPACT MODE
+        // ========================
+        function toggleCompactMode() {
+            const on = document.getElementById('compact-mode-toggle').checked;
+            document.body.classList.toggle('compact-mode', on);
+            localStorage.setItem('compactMode', on ? '1' : '0');
+        }
+        function loadCompactMode() {
+            if (localStorage.getItem('compactMode') === '1') {
+                document.body.classList.add('compact-mode');
+                const tog = document.getElementById('compact-mode-toggle');
+                if (tog) tog.checked = true;
+            }
+        }
+
+        // ========================
+        // GRAPHIQUE CA MENSUEL
+        // ========================
+        let caMonthlyChartInst = null;
+        function updateMonthlyChart() {
+            const months = document.getElementById('monthly-chart-24m')?.checked ? 24 : 12;
+            const now = new Date();
+            const labels = [], dataCA = [];
+            for (let i = months - 1; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                labels.push(d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' }));
+                dataCA.push(factures.filter(f => f.date && f.date.startsWith(ym) && f.payee === 'OUI').reduce((a, f) => a + f.ht, 0));
+            }
+            const n = dataCA.length;
+            const sumX = n * (n - 1) / 2, sumY = dataCA.reduce((a, b) => a + b, 0);
+            const sumXY = dataCA.reduce((a, v, i) => a + i * v, 0), sumX2 = dataCA.reduce((a, _, i) => a + i * i, 0);
+            const denom = n * sumX2 - sumX * sumX;
+            const slope = denom ? (n * sumXY - sumX * sumY) / denom : 0;
+            const intercept = (sumY - slope * sumX) / n;
+            const dataTrend = dataCA.map((_, i) => Math.max(0, Math.round(intercept + slope * i)));
+
+            const card = document.getElementById('monthly-chart-card');
+            if (factures.length > 0 && card) card.style.display = 'block';
+            const isDark = document.body.classList.contains('dark-mode');
+            const col = isDark ? '#ecf0f1' : '#666';
+            if (caMonthlyChartInst) caMonthlyChartInst.destroy();
+            caMonthlyChartInst = new Chart(document.getElementById('caMonthlyChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [
+                    { label: 'CA encaissé HT', data: dataCA, backgroundColor: 'rgba(52,152,219,0.72)', borderRadius: 4, order: 2 },
+                    { label: 'Tendance', data: dataTrend, type: 'line', borderColor: '#e74c3c', borderWidth: 2, pointRadius: 0, fill: false, borderDash: [5, 4], order: 1 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: col, boxWidth: 12, font: { size: 11 } } } },
+                    scales: { y: { beginAtZero: true, ticks: { color: col, callback: v => formatMoney(v) + ' €' } }, x: { ticks: { color: col, maxRotation: 45 } } }
+                }
+            });
+        }
+
+        // ========================
+        // HISTORIQUE EXPORTS
+        // ========================
+        function trackExport(type) {
+            const hist = JSON.parse(localStorage.getItem('exportHistory') || '[]');
+            hist.unshift({ type, ts: Date.now() });
+            localStorage.setItem('exportHistory', JSON.stringify(hist.slice(0, 5)));
+            renderExportHistory();
+        }
+        function renderExportHistory() {
+            const el = document.getElementById('export-history-section');
+            if (!el) return;
+            const hist = JSON.parse(localStorage.getItem('exportHistory') || '[]');
+            if (!hist.length) { el.innerHTML = ''; return; }
+            el.innerHTML = '<div style="font-size:12px;font-weight:bold;color:#888;margin-bottom:4px;">Derniers exports :</div>' +
+                hist.map(h => `<div style="font-size:12px;color:#888;padding:1px 0;">• ${h.type} — ${new Date(h.ts).toLocaleString('fr-FR')}</div>`).join('');
+        }
+
+        // ========================
+        // VUE ANNUELLE CONGÉS (mini)
+        // ========================
+        function renderCongesAnnualView() {
+            const el = document.getElementById('conges-annual-view');
+            if (!el || !currentAnneeConges) return;
+            const cfg = congesConfig.find(c => c.annee === currentAnneeConges);
+            if (!cfg) { el.innerHTML = ''; return; }
+            const vacByDate = {};
+            congesEntrees.filter(e => e.annee === currentAnneeConges && e.date_calendrier)
+                         .forEach(e => { vacByDate[e.date_calendrier] = e.type_conge; });
+            const moisFR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+            const startDate = cfg.debut_periode ? new Date(cfg.debut_periode + 'T00:00:00') : new Date(currentAnneeConges, 0, 1);
+            const startYear = startDate.getFullYear(), startMonth = startDate.getMonth();
+            let html = `<details style="margin-bottom:4px;"><summary style="cursor:pointer;font-size:13px;font-weight:bold;color:var(--primary);user-select:none;padding:4px 0;">Vue annuelle (12 mois)</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px;">`;
+            for (let mi = 0; mi < 12; mi++) {
+                const m = (startMonth + mi) % 12;
+                const y = startYear + Math.floor((startMonth + mi) / 12);
+                const daysInMonth = new Date(y, m + 1, 0).getDate();
+                let startDow = new Date(y, m, 1).getDay(); if (startDow === 0) startDow = 7;
+                html += `<div style="border:0.5px solid var(--border);border-radius:5px;padding:5px;"><div style="font-size:10px;font-weight:bold;color:#888;text-align:center;margin-bottom:3px;">${moisFR[m]}</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;">`;
+                for (let i = 1; i < startDow; i++) html += '<div></div>';
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                    const dow = new Date(y, m, d).getDay();
+                    const isWE = dow === 0 || dow === 6;
+                    const isFer = !isWE && isFerie(ds);
+                    const type = vacByDate[ds];
+                    let bg = 'transparent';
+                    if (isWE) bg = 'var(--border)';
+                    else if (isFer) bg = '#fce8e8';
+                    else if (type === 'plein') bg = '#27ae60';
+                    else if (type === 'matin' || type === 'apres_midi') bg = '#3498db';
+                    else if (type === 'offert') bg = '#f39c12';
+                    const txtCol = isWE ? 'transparent' : (bg === 'transparent' ? 'var(--text)' : bg === '#fce8e8' ? '#c0605a' : 'white');
+                    html += `<div style="aspect-ratio:1;border-radius:2px;background:${bg};font-size:7px;color:${txtCol};display:flex;align-items:center;justify-content:center;line-height:1;opacity:${isWE ? '0.25' : '1'}">${isWE ? '' : d}</div>`;
+                }
+                html += '</div></div>';
+            }
+            html += '</div></details>';
+            el.innerHTML = html;
+        }
+
+        // ========================
+        // COMPTEUR SOLDE CONGÉS (calendrier)
+        // ========================
+        function updateCongesSoldeCounter() {
+            const el = document.getElementById('conges-solde-counter');
+            if (!el || !currentAnneeConges) return;
+            const cfg = congesConfig.find(c => c.annee === currentAnneeConges);
+            if (!cfg) { el.style.display = 'none'; return; }
+            const report = getReportVers(currentAnneeConges);
+            const total_dispo = parseFloat(cfg.jours_attribues) + report;
+            const isWEDate2 = ds => { if (!ds) return false; const d = new Date(ds + 'T00:00:00'); return d.getDay() === 0 || d.getDay() === 6; };
+            const total_pose = congesEntrees.filter(e => e.annee === currentAnneeConges && !isWEDate2(e.date_calendrier)).reduce((a, e) => a + parseFloat(e.nb_jours), 0);
+            const reste = total_dispo - total_pose;
+            const restColor = reste <= 0 ? 'var(--danger)' : reste < 5 ? 'var(--orange)' : 'var(--success)';
+            el.style.display = 'flex';
+            el.innerHTML = `
+                <div style="text-align:center;"><div style="font-size:11px;color:#888;">Attribués</div><div style="font-size:18px;font-weight:bold;color:var(--primary);">${cfg.jours_attribues} j</div></div>
+                <div style="text-align:center;opacity:${report > 0 ? 1 : 0.4};"><div style="font-size:11px;color:#888;">Report N-1</div><div style="font-size:18px;font-weight:bold;color:var(--accent);">+${report} j</div></div>
+                <div style="text-align:center;"><div style="font-size:11px;color:#888;">Posés</div><div style="font-size:18px;font-weight:bold;color:var(--danger);">${total_pose} j</div></div>
+                <div style="text-align:center;border-left:1px solid var(--border);padding-left:16px;"><div style="font-size:11px;color:#888;">Restants</div><div style="font-size:22px;font-weight:bold;color:${restColor};">${reste} j</div></div>`;
+        }
+
+        // ========================
+        // MODÈLES DE CHARGES
+        // ========================
+        function saveChargesTemplate() {
+            let type = document.getElementById('charge-type').value;
+            if (type === 'Autre') type = document.getElementById('charge-type-autre').value.trim();
+            const montant = parseFloat(document.getElementById('charge-montant').value);
+            if (!type || !montant) { showToast('Saisissez le type et le montant d\'abord.', 'warning'); return; }
+            const templates = JSON.parse(localStorage.getItem('chargesTemplates') || '[]');
+            templates.push({ type, montant, notes: document.getElementById('charge-notes').value.trim(), statut: document.getElementById('charge-statut').value });
+            localStorage.setItem('chargesTemplates', JSON.stringify(templates.slice(-10)));
+            showToast('Modèle « ' + type + ' » enregistré.', 'success');
+            renderChargesTemplates();
+        }
+        function deleteChargesTemplate(idx) {
+            const t = JSON.parse(localStorage.getItem('chargesTemplates') || '[]');
+            t.splice(idx, 1);
+            localStorage.setItem('chargesTemplates', JSON.stringify(t));
+            renderChargesTemplates();
+        }
+        function loadChargesTemplate(idx) {
+            const t = JSON.parse(localStorage.getItem('chargesTemplates') || '[]');
+            const tmpl = t[idx]; if (!tmpl) return;
+            cancelEditCharge();
+            document.getElementById('charge-date').valueAsDate = new Date();
+            if (standardChargeTypes.includes(tmpl.type)) {
+                document.getElementById('charge-type').value = tmpl.type;
+                document.getElementById('charge-type-autre').style.display = 'none';
+                document.getElementById('charge-type-autre').required = false;
+            } else {
+                document.getElementById('charge-type').value = 'Autre';
+                document.getElementById('charge-type-autre').style.display = 'block';
+                document.getElementById('charge-type-autre').required = true;
+                document.getElementById('charge-type-autre').value = tmpl.type;
+            }
+            document.getElementById('charge-montant').value = tmpl.montant;
+            document.getElementById('charge-notes').value = tmpl.notes || '';
+            document.getElementById('charge-statut').value = tmpl.statut || 'Provisionnelle';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        function renderChargesTemplates() {
+            const el = document.getElementById('charges-templates-bar');
+            if (!el) return;
+            const templates = JSON.parse(localStorage.getItem('chargesTemplates') || '[]');
+            if (!templates.length) { el.style.display = 'none'; return; }
+            el.style.display = 'block';
+            el.innerHTML = '<div style="font-size:12px;font-weight:bold;color:#666;margin-bottom:6px;">⭐ Modèles enregistrés :</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' +
+                templates.map((t, i) => `<div style="background:white;border:1px solid #f5b041;border-radius:5px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:7px;">
+                    <span style="color:#333;">${t.type} — ${formatMoney(t.montant)} €</span>
+                    <button class="btn btn-info" onclick="loadChargesTemplate(${i})" style="padding:2px 7px;font-size:11px;" title="Pré-remplir le formulaire">Utiliser</button>
+                    <button class="btn btn-danger" onclick="deleteChargesTemplate(${i})" style="padding:2px 6px;font-size:11px;" title="Supprimer ce modèle">✕</button>
+                </div>`).join('') + '</div>';
+        }
+
     </script>
 
     </div><!-- fin #app-content -->
