@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
+<!-- Application installable (conservés après le chargement de l'application : data-keep) -->
+<link rel="manifest" href="manifest.webmanifest" data-keep>
+<link rel="icon" type="image/png" href="favicon-32.png" data-keep>
+<link rel="apple-touch-icon" href="apple-touch-icon.png" data-keep>
+<meta name="theme-color" content="#111827" data-keep>
+<meta name="mobile-web-app-capable" content="yes" data-keep>
+<meta name="apple-mobile-web-app-capable" content="yes" data-keep>
+<meta name="apple-mobile-web-app-title" content="Facturation" data-keep>
 <title>Suivi Facturation</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
 <style>
@@ -42,6 +50,7 @@
 (function () {
   // Tout est enfermé dans cette fonction : aucune variable globale ne doit
   // entrer en conflit avec celles de l'application chargée ensuite.
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   var APP = 'facturation';
   var SB_URL = 'https://hnwykzwlixhednsiymny.supabase.co';
   var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhud3lrendsaXhoZWRuc2l5bW55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODY1NjIsImV4cCI6MjA5NjE2MjU2Mn0.JvLwwH1UMot9BrQsx_yQuVin5pKM8FldSG9C95kMDDU';
@@ -68,7 +77,8 @@
     var scripts = Array.prototype.slice.call(doc.querySelectorAll('script'));
     scripts.forEach(function (s) { s.parentNode.removeChild(s); });
     document.documentElement.setAttribute('lang', doc.documentElement.getAttribute('lang') || 'fr');
-    while (document.head.firstChild) document.head.removeChild(document.head.firstChild);
+    // On garde les balises d'installation (manifeste, icônes), on remplace le reste de l'en-tête
+    Array.prototype.slice.call(document.head.childNodes).forEach(function (n) { if (!(n.nodeType === 1 && n.hasAttribute('data-keep'))) document.head.removeChild(n); });
     Array.prototype.slice.call(doc.head.childNodes).forEach(function (n) { document.head.appendChild(document.adoptNode(n)); });
     document.documentElement.replaceChild(document.adoptNode(doc.body), document.body);
     for (var i = 0; i < scripts.length; i++) {
